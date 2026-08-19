@@ -64,6 +64,25 @@ void main() {
     expect(restored.createdAt, createdAt);
   });
 
+  test('NotificationModel يدعم إشعار اعتماد تمييز وظيفة دون مرجع تقديم', () {
+    final createdAt = DateTime.utc(2026, 8, 20, 12);
+    final model = NotificationModel(
+      id: 'feature-notification-id',
+      userId: 'employer-id',
+      title: 'تم تمييز وظيفتك',
+      message: 'تم استلام الدفعة وتم تمييز وظيفتك بنجاح.',
+      isRead: false,
+      createdAt: createdAt,
+      applicationId: '',
+    );
+
+    final restored = NotificationModel.fromJson(model.toJson());
+
+    expect(restored.userId, 'employer-id');
+    expect(restored.applicationId, isEmpty);
+    expect(restored.title, 'تم تمييز وظيفتك');
+  });
+
   test('FeatureRequestModel يحافظ على حالة المراجعة ووقت الطلب', () {
     final requestedAt = DateTime.utc(2026, 8, 20, 12);
     final model = FeatureRequestModel(
@@ -79,5 +98,12 @@ void main() {
     expect(restored.id, model.id);
     expect(restored.status, FeatureRequestStatus.pending);
     expect(restored.requestedAt, requestedAt);
+  });
+
+  test('FeatureRequestStatus يتعرف على حالة الاعتماد', () {
+    expect(
+      FeatureRequestStatus.fromValue('approved'),
+      FeatureRequestStatus.approved,
+    );
   });
 }

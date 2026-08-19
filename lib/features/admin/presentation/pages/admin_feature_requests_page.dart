@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../shared/models/feature_request_model.dart';
 import '../../data/admin_repository.dart';
 import '../widgets/admin_access_gate.dart';
 
@@ -14,7 +13,7 @@ class AdminFeatureRequestsPage extends ConsumerWidget {
       final repository = ref.watch(adminRepositoryProvider);
       return Scaffold(
         appBar: AppBar(title: const Text('طلبات تمييز الوظائف')),
-        body: StreamBuilder<List<FeatureRequestModel>>(
+        body: StreamBuilder<List<FeatureRequestAdminRow>>(
           stream: repository.watchPendingFeatureRequests(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
@@ -37,13 +36,47 @@ class AdminFeatureRequestsPage extends ConsumerWidget {
                 ),
               );
             }
-            return ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: requests.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => _FeatureRequestCard(
-                request: requests[index],
-                repository: repository,
+            return LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: constraints.maxWidth < 820
+                          ? 820
+                          : constraints.maxWidth,
+                    ),
+                    child: DataTable(
+                      columnSpacing: 28,
+                      columns: const [
+                        DataColumn(label: Text('الشركة')),
+                        DataColumn(label: Text('الوظيفة المطلوبة')),
+                        DataColumn(label: Text('تاريخ الطلب')),
+                        DataColumn(label: Text('الإجراء')),
+                      ],
+                      rows: requests
+                          .map(
+                            (row) => DataRow(
+                              cells: [
+                                DataCell(Text(row.companyName)),
+                                DataCell(Text(row.jobTitle)),
+                                DataCell(
+                                  Text(_formatDate(row.request.requestedAt)),
+                                ),
+                                DataCell(
+                                  _FeatureRequestActions(
+                                    row: row,
+                                    repository: repository,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ),
+                ),
               ),
             );
           },
@@ -53,52 +86,41 @@ class AdminFeatureRequestsPage extends ConsumerWidget {
   );
 }
 
-class _FeatureRequestCard extends StatelessWidget {
-  const _FeatureRequestCard({required this.request, required this.repository});
+String _formatDate(DateTime dateTime) {
+  final local = dateTime.toLocal();
+  return '${local.year.toString().padLeft(4, '0')}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}';
+}
 
-  final FeatureRequestModel request;
+class _FeatureRequestActions extends StatelessWidget {
+  const _FeatureRequestActions({required this.row, required this.repository});
+
+  final FeatureRequestAdminRow row;
   final AdminRepository repository;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'طلب للوظيفة: ${request.jobId}',
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 6),
-          Text('معرف صاحب الشركة: ${request.employerId}'),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ElevatedButton(
-                onPressed: () => _run(
-                  context,
-                  () => repository.approveFeatureRequest(request.id),
-                  'تم اعتماد الطلب وتمييز الوظيفة.',
-                ),
-                child: const Text('اعتماد'),
+  Widget build(BuildContext context) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: [
+      ElevatedButton(
+        onPressed: row.job == null
+            ? null
+            : () => _run(
+                context,
+                () => repository.approveFeatureRequest(row.request.id),
+                'تم اعتماد الدفعة وتمييز الوظيفة وإرسال إشعار لصاحب العمل.',
               ),
-              OutlinedButton(
-                onPressed: () => _run(
-                  context,
-                  () => repository.rejectFeatureRequest(request.id),
-                  'تم رفض طلب التمييز.',
-                ),
-                child: const Text('رفض'),
-              ),
-            ],
-          ),
-        ],
+        child: const Text('اعتماد الدفع وتمييز الوظيفة'),
       ),
-    ),
+      OutlinedButton(
+        onPressed: () => _run(
+          context,
+          () => repository.rejectFeatureRequest(row.request.id),
+          'تم رفض طلب التمييز.',
+        ),
+        child: const Text('رفض'),
+      ),
+    ],
   );
 
   Future<void> _run(

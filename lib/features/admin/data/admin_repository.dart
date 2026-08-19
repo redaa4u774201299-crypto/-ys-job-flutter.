@@ -51,16 +51,29 @@ class AdminRepository {
       .snapshots()
       .map((snapshot) => snapshot.size);
 
-  Stream<List<FeatureRequestModel>> watchPendingFeatureRequests() => _firestore
-      .collection('feature_requests')
-      .where('status', isEqualTo: FeatureRequestStatus.pending.value)
-      .orderBy('requestedAt', descending: true)
-      .snapshots()
-      .map(
-        (snapshot) => snapshot.docs
-            .map(FeatureRequestModel.fromFirestore)
-            .toList(growable: false),
-      );
+  Stream<List<FeatureRequestAdminRow>> watchPendingFeatureRequests() =>
+      _firestore
+          .collection('feature_requests')
+          .where('status', isEqualTo: FeatureRequestStatus.pending.value)
+          .orderBy('requestedAt', descending: true)
+          .snapshots()
+          .asyncMap((snapshot) async {
+            final requests = snapshot.docs
+                .map(FeatureRequestModel.fromFirestore)
+                .toList(growable: false);
+            return Future.wait(
+              requests.map((request) async {
+                final jobSnapshot = await _firestore
+                    .collection('jobs')
+                    .doc(request.jobId)
+                    .get();
+                final job = jobSnapshot.exists
+                    ? JobModel.fromFirestore(jobSnapshot)
+                    : null;
+                return FeatureRequestAdminRow(request: request, job: job);
+              }),
+            );
+          });
 
   Future<void> setUserActive({
     required String userId,
@@ -94,30 +107,45 @@ class AdminRepository {
   }
 
   Future<void> approveFeatureRequest(String requestId) async {
-    await _requireAdmin();
+    final admin = await _requireAdmin();
     final requestReference = _firestore
         .collection('feature_requests')
         .doc(requestId);
-    await _firestore.runTransaction((transaction) async {
-      final requestSnapshot = await transaction.get(requestReference);
-      if (!requestSnapshot.exists) throw StateError('طلب التمييز غير متاح.');
-      final request = FeatureRequestModel.fromFirestore(requestSnapshot);
-      if (request.status != FeatureRequestStatus.pending) {
-        throw StateError('تمت مراجعة هذا الطلب مسبقًا.');
-      }
-      final jobReference = _firestore.collection('jobs').doc(request.jobId);
-      final jobSnapshot = await transaction.get(jobReference);
-      if (!jobSnapshot.exists)
-        throw StateError('الوظيفة المرتبطة بالطلب غير متاحة.');
-      if (jobSnapshot.data()?['employerId'] != request.employerId) {
-        throw StateError('بيانات ملكية الوظيفة لا تطابق طلب التمييز.');
-      }
-      transaction.update(jobReference, {'isFeatured': true});
-      transaction.update(requestReference, {
-        'status': FeatureRequestStatus.approved.value,
-        'reviewedAt': FieldValue.serverTimestamp(),
-      });
+    final requestSnapshot = await requestReference.get();
+    if (!requestSnapshot.exists) throw StateError('طلب التمييز غير متاح.');
+    final request = FeatureRequestModel.fromFirestore(requestSnapshot);
+    if (request.status != FeatureRequestStatus.pending) {
+      throw StateError('تمت مراجعة هذا الطلب مسبقًا.');
+    }
+
+    final jobReference = _firestore.collection('jobs').doc(request.jobId);
+    final jobSnapshot = await jobReference.get();
+    if (!jobSnapshot.exists) {
+      throw StateError('الوظيفة المرتبطة بالطلب غير متاحة.');
+    }
+    final job = JobModel.fromFirestore(jobSnapshot);
+    if (job.employerId != request.employerId) {
+      throw StateError('بيانات ملكية الوظيفة لا تطابق طلب التمييز.');
+    }
+
+    final notificationReference = _firestore.collection('notifications').doc();
+    final batch = _firestore.batch();
+    batch.update(jobReference, {'isFeatured': true});
+    batch.update(requestReference, {
+      'status': FeatureRequestStatus.approved.value,
+      'reviewedAt': FieldValue.serverTimestamp(),
+      'reviewedBy': admin.id,
     });
+    batch.set(notificationReference, {
+      'id': notificationReference.id,
+      'userId': request.employerId,
+      'title': 'تم تمييز وظيفتك',
+      'message': 'تم استلام الدفعة وتم تمييز وظيفتك "${job.title}" بنجاح.',
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'applicationId': '',
+    });
+    await batch.commit();
   }
 
   Future<void> rejectFeatureRequest(String requestId) async {
@@ -153,5 +181,22 @@ class AdminRepository {
       throw StateError('لا تملك صلاحية تنفيذ إجراء إداري.');
     }
     return profile;
+  }
+}
+
+class FeatureRequestAdminRow {
+  const FeatureRequestAdminRow({required this.request, required this.job});
+
+  final FeatureRequestModel request;
+  final JobModel? job;
+
+  String get companyName {
+    final name = job?.employerName.trim() ?? '';
+    return name.isEmpty ? 'اسم الشركة غير متاح' : name;
+  }
+
+  String get jobTitle {
+    final title = job?.title.trim() ?? '';
+    return title.isEmpty ? 'الوظيفة غير متاحة' : title;
   }
 }
