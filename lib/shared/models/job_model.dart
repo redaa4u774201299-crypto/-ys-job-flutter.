@@ -2,12 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum JobStatus {
   active,
-  closed;
+  closed,
+  hidden;
 
   String get value => name;
 
+  String get label => switch (this) {
+    JobStatus.active => 'نشطة',
+    JobStatus.closed => 'مغلقة',
+    JobStatus.hidden => 'مخفية',
+  };
+
   static JobStatus fromValue(String? value) => switch (value) {
     'closed' => JobStatus.closed,
+    'hidden' => JobStatus.hidden,
     _ => JobStatus.active,
   };
 }

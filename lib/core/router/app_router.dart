@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/admin/presentation/pages/admin_dashboard_page.dart';
+import '../../features/admin/presentation/pages/admin_jobs_page.dart';
+import '../../features/admin/presentation/pages/admin_users_page.dart';
 import '../../features/companies/presentation/pages/companies_page.dart';
 import '../../features/employer/presentation/pages/employer_dashboard_page.dart';
 import '../../features/employer/presentation/pages/post_job_page.dart';
@@ -53,6 +56,18 @@ final appRouterProvider = Provider<GoRouter>(
           GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfilePage(),
+          ),
+          GoRoute(
+            path: '/admin-dashboard',
+            builder: (context, state) => const AdminDashboardPage(),
+          ),
+          GoRoute(
+            path: '/admin/users',
+            builder: (context, state) => const AdminUsersPage(),
+          ),
+          GoRoute(
+            path: '/admin/jobs',
+            builder: (context, state) => const AdminJobsPage(),
           ),
         ],
       ),

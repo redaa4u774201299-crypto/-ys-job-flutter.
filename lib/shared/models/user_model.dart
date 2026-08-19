@@ -2,12 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum UserRole {
   seeker,
-  employer;
+  employer,
+  admin;
 
   String get value => name;
 
+  String get label => switch (this) {
+    UserRole.seeker => 'باحث عن عمل',
+    UserRole.employer => 'صاحب شركة',
+    UserRole.admin => 'مشرف',
+  };
+
   static UserRole fromValue(String? value) => switch (value) {
     'employer' => UserRole.employer,
+    'admin' => UserRole.admin,
     _ => UserRole.seeker,
   };
 }
@@ -22,6 +30,7 @@ class UserModel {
     this.bio = '',
     this.skills = const [],
     this.resumeUrl = '',
+    this.isActive = true,
   });
 
   final String id;
@@ -32,6 +41,7 @@ class UserModel {
   final String bio;
   final List<String> skills;
   final String resumeUrl;
+  final bool isActive;
 
   UserModel copyWith({
     String? id,
@@ -42,6 +52,7 @@ class UserModel {
     String? bio,
     List<String>? skills,
     String? resumeUrl,
+    bool? isActive,
   }) => UserModel(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -51,6 +62,7 @@ class UserModel {
     bio: bio ?? this.bio,
     skills: skills ?? this.skills,
     resumeUrl: resumeUrl ?? this.resumeUrl,
+    isActive: isActive ?? this.isActive,
   );
 
   Map<String, dynamic> toJson() => {
@@ -62,6 +74,7 @@ class UserModel {
     'bio': bio,
     'skills': skills,
     'resumeUrl': resumeUrl,
+    'isActive': isActive,
   };
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
@@ -75,6 +88,7 @@ class UserModel {
     bio: _asText(json['bio']),
     skills: _asTextList(json['skills']),
     resumeUrl: _asText(json['resumeUrl']),
+    isActive: json['isActive'] != false,
   );
 
   Map<String, dynamic> toFirestore() => {
@@ -86,6 +100,7 @@ class UserModel {
     'bio': bio,
     'skills': skills,
     'resumeUrl': resumeUrl,
+    'isActive': isActive,
   };
 
   factory UserModel.fromFirestore(
@@ -112,8 +127,9 @@ List<String> _asTextList(dynamic value) {
 DateTime? _asDate(dynamic value) {
   if (value is Timestamp) return value.toDate().toUtc();
   if (value is DateTime) return value.toUtc();
-  if (value is int)
+  if (value is int) {
     return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  }
   if (value is String) return DateTime.tryParse(value)?.toUtc();
   return null;
 }

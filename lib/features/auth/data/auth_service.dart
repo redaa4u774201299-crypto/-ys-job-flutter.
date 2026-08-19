@@ -33,6 +33,10 @@ final authStateProvider = StreamProvider<User?>(
   (ref) => ref.watch(authServiceProvider).authStateChanges,
 );
 
+final userProfileProvider = StreamProvider.family<UserModel?, String>(
+  (ref, userId) => ref.watch(authServiceProvider).watchProfile(userId),
+);
+
 class AuthService {
   AuthService(this._auth, this._firestore);
 
@@ -74,6 +78,9 @@ class AuthService {
     required UserRole role,
   }) async {
     _validateRegistration(name: name, email: email, password: password);
+    if (role == UserRole.admin) {
+      throw StateError('لا يمكن إنشاء حساب إدارة من واجهة التسجيل العامة.');
+    }
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
@@ -120,10 +127,12 @@ class AuthService {
         'لا يوجد ملف مستخدم مرتبط بهذا الحساب. أنشئ حسابًا جديدًا أو تواصل مع الإدارة.',
       );
     }
-    return AuthSession(
-      firebaseUser: firebaseUser,
-      profile: UserModel.fromFirestore(snapshot),
-    );
+    final profile = UserModel.fromFirestore(snapshot);
+    if (!profile.isActive) {
+      await _auth.signOut();
+      throw StateError('هذا الحساب موقوف. تواصل مع إدارة المنصة.');
+    }
+    return AuthSession(firebaseUser: firebaseUser, profile: profile);
   }
 
   void _validateCredentials({required String email, required String password}) {
@@ -153,8 +162,11 @@ class AuthSession {
   final User firebaseUser;
   final UserModel profile;
 
-  String get destination =>
-      profile.role == UserRole.employer ? '/employer-dashboard' : '/jobs';
+  String get destination => switch (profile.role) {
+    UserRole.admin => '/admin-dashboard',
+    UserRole.employer => '/employer-dashboard',
+    UserRole.seeker => '/jobs',
+  };
 }
 
 String authFailureMessage(Object error) {
