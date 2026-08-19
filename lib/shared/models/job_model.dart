@@ -1,5 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum JobStatus {
+  active,
+  closed;
+
+  String get value => name;
+
+  static JobStatus fromValue(String? value) => switch (value) {
+    'closed' => JobStatus.closed,
+    _ => JobStatus.active,
+  };
+}
+
 class JobModel {
   const JobModel({
     required this.id,
@@ -11,6 +23,9 @@ class JobModel {
     required this.salaryRange,
     required this.isFeatured,
     required this.postedAt,
+    this.requirements = '',
+    this.status = JobStatus.active,
+    this.employerName = '',
   });
 
   final String id;
@@ -22,6 +37,11 @@ class JobModel {
   final String salaryRange;
   final bool isFeatured;
   final DateTime postedAt;
+  final String requirements;
+  final JobStatus status;
+  final String employerName;
+
+  bool get isActive => status == JobStatus.active;
 
   JobModel copyWith({
     String? id,
@@ -33,6 +53,9 @@ class JobModel {
     String? salaryRange,
     bool? isFeatured,
     DateTime? postedAt,
+    String? requirements,
+    JobStatus? status,
+    String? employerName,
   }) => JobModel(
     id: id ?? this.id,
     employerId: employerId ?? this.employerId,
@@ -43,6 +66,9 @@ class JobModel {
     salaryRange: salaryRange ?? this.salaryRange,
     isFeatured: isFeatured ?? this.isFeatured,
     postedAt: postedAt ?? this.postedAt,
+    requirements: requirements ?? this.requirements,
+    status: status ?? this.status,
+    employerName: employerName ?? this.employerName,
   );
 
   Map<String, dynamic> toJson() => {
@@ -55,6 +81,9 @@ class JobModel {
     'salaryRange': salaryRange,
     'isFeatured': isFeatured,
     'postedAt': postedAt.toUtc().toIso8601String(),
+    'requirements': requirements,
+    'status': status.value,
+    'employerName': employerName,
   };
 
   factory JobModel.fromJson(Map<String, dynamic> json) => JobModel(
@@ -69,6 +98,9 @@ class JobModel {
     postedAt:
         _asDate(json['postedAt']) ??
         DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+    requirements: _asText(json['requirements']),
+    status: JobStatus.fromValue(_asText(json['status'])),
+    employerName: _asText(json['employerName']),
   );
 
   Map<String, dynamic> toFirestore() => {
@@ -81,6 +113,9 @@ class JobModel {
     'salaryRange': salaryRange,
     'isFeatured': isFeatured,
     'postedAt': Timestamp.fromDate(postedAt.toUtc()),
+    'requirements': requirements,
+    'status': status.value,
+    'employerName': employerName,
   };
 
   factory JobModel.fromFirestore(
@@ -93,24 +128,14 @@ class JobModel {
 
 String _asText(dynamic value) {
   final text = value?.toString().trim() ?? '';
-  if (text == 'null') {
-    return '';
-  }
-  return text;
+  return text == 'null' ? '' : text;
 }
 
 DateTime? _asDate(dynamic value) {
-  if (value is Timestamp) {
-    return value.toDate().toUtc();
-  }
-  if (value is DateTime) {
-    return value.toUtc();
-  }
-  if (value is int) {
+  if (value is Timestamp) return value.toDate().toUtc();
+  if (value is DateTime) return value.toUtc();
+  if (value is int)
     return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
-  }
-  if (value is String) {
-    return DateTime.tryParse(value)?.toUtc();
-  }
+  if (value is String) return DateTime.tryParse(value)?.toUtc();
   return null;
 }

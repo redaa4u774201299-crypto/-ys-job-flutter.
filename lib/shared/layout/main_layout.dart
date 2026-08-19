@@ -12,6 +12,7 @@ class MainLayout extends StatelessWidget {
     _NavLink('الرئيسية', '/', Icons.home_outlined),
     _NavLink('الوظائف', '/jobs', Icons.work_outline),
     _NavLink('الشركات', '/companies', Icons.business_outlined),
+    _NavLink('حسابي', '/profile', Icons.person_outline),
   ];
 
   @override

@@ -5,8 +5,11 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/companies/presentation/pages/companies_page.dart';
 import '../../features/employer/presentation/pages/employer_dashboard_page.dart';
+import '../../features/employer/presentation/pages/post_job_page.dart';
 import '../../features/home/presentation/pages/landing_page.dart';
 import '../../features/jobs/presentation/pages/jobs_page.dart';
+import '../../features/seeker/presentation/pages/job_details_page.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../shared/layout/main_layout.dart';
 
 final appRouterProvider = Provider<GoRouter>(
@@ -37,6 +40,19 @@ final appRouterProvider = Provider<GoRouter>(
           GoRoute(
             path: '/employer-dashboard',
             builder: (context, state) => const EmployerDashboardPage(),
+          ),
+          GoRoute(
+            path: '/employer/post-job',
+            builder: (context, state) => const PostJobPage(),
+          ),
+          GoRoute(
+            path: '/job/:id',
+            builder: (context, state) =>
+                JobDetailsPage(jobId: state.pathParameters['id']!),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfilePage(),
           ),
         ],
       ),
