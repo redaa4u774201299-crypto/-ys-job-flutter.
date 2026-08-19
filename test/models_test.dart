@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ys_job/shared/models/feature_request_model.dart';
 import 'package:ys_job/shared/models/job_model.dart';
+import 'package:ys_job/shared/models/notification_model.dart';
 import 'package:ys_job/shared/models/user_model.dart';
 
 void main() {
@@ -40,5 +42,42 @@ void main() {
     expect(restored.employerId, model.employerId);
     expect(restored.isFeatured, isTrue);
     expect(restored.postedAt, postedAt);
+  });
+
+  test('NotificationModel يحافظ على المستلم وحالة القراءة ومرجع الطلب', () {
+    final createdAt = DateTime.utc(2026, 8, 20, 12);
+    final model = NotificationModel(
+      id: 'notification-id',
+      userId: 'seeker-id',
+      title: 'تحديث حالة الطلب',
+      message: 'تم قبولك لمقابلة.',
+      isRead: false,
+      createdAt: createdAt,
+      applicationId: 'application-id',
+    );
+
+    final restored = NotificationModel.fromJson(model.toJson());
+
+    expect(restored.userId, 'seeker-id');
+    expect(restored.isRead, isFalse);
+    expect(restored.applicationId, 'application-id');
+    expect(restored.createdAt, createdAt);
+  });
+
+  test('FeatureRequestModel يحافظ على حالة المراجعة ووقت الطلب', () {
+    final requestedAt = DateTime.utc(2026, 8, 20, 12);
+    final model = FeatureRequestModel(
+      id: 'job-id',
+      jobId: 'job-id',
+      employerId: 'employer-id',
+      status: FeatureRequestStatus.pending,
+      requestedAt: requestedAt,
+    );
+
+    final restored = FeatureRequestModel.fromJson(model.toJson());
+
+    expect(restored.id, model.id);
+    expect(restored.status, FeatureRequestStatus.pending);
+    expect(restored.requestedAt, requestedAt);
   });
 }

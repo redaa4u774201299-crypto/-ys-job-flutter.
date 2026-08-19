@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase/firebase_runtime.dart';
+import '../../../shared/models/feature_request_model.dart';
 import '../../../shared/models/job_model.dart';
 import '../../../shared/models/user_model.dart';
 
@@ -50,6 +51,17 @@ class AdminRepository {
       .snapshots()
       .map((snapshot) => snapshot.size);
 
+  Stream<List<FeatureRequestModel>> watchPendingFeatureRequests() => _firestore
+      .collection('feature_requests')
+      .where('status', isEqualTo: FeatureRequestStatus.pending.value)
+      .orderBy('requestedAt', descending: true)
+      .snapshots()
+      .map(
+        (snapshot) => snapshot.docs
+            .map(FeatureRequestModel.fromFirestore)
+            .toList(growable: false),
+      );
+
   Future<void> setUserActive({
     required String userId,
     required bool isActive,
@@ -78,6 +90,52 @@ class AdminRepository {
     await _requireAdmin();
     await _firestore.collection('jobs').doc(jobId).update({
       'isFeatured': isFeatured,
+    });
+  }
+
+  Future<void> approveFeatureRequest(String requestId) async {
+    await _requireAdmin();
+    final requestReference = _firestore
+        .collection('feature_requests')
+        .doc(requestId);
+    await _firestore.runTransaction((transaction) async {
+      final requestSnapshot = await transaction.get(requestReference);
+      if (!requestSnapshot.exists) throw StateError('طلب التمييز غير متاح.');
+      final request = FeatureRequestModel.fromFirestore(requestSnapshot);
+      if (request.status != FeatureRequestStatus.pending) {
+        throw StateError('تمت مراجعة هذا الطلب مسبقًا.');
+      }
+      final jobReference = _firestore.collection('jobs').doc(request.jobId);
+      final jobSnapshot = await transaction.get(jobReference);
+      if (!jobSnapshot.exists)
+        throw StateError('الوظيفة المرتبطة بالطلب غير متاحة.');
+      if (jobSnapshot.data()?['employerId'] != request.employerId) {
+        throw StateError('بيانات ملكية الوظيفة لا تطابق طلب التمييز.');
+      }
+      transaction.update(jobReference, {'isFeatured': true});
+      transaction.update(requestReference, {
+        'status': FeatureRequestStatus.approved.value,
+        'reviewedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Future<void> rejectFeatureRequest(String requestId) async {
+    await _requireAdmin();
+    final reference = _firestore.collection('feature_requests').doc(requestId);
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(reference);
+      if (!snapshot.exists) throw StateError('طلب التمييز غير متاح.');
+      if (FeatureRequestStatus.fromValue(
+            snapshot.data()?['status']?.toString(),
+          ) !=
+          FeatureRequestStatus.pending) {
+        throw StateError('تمت مراجعة هذا الطلب مسبقًا.');
+      }
+      transaction.update(reference, {
+        'status': FeatureRequestStatus.rejected.value,
+        'reviewedAt': FieldValue.serverTimestamp(),
+      });
     });
   }
 

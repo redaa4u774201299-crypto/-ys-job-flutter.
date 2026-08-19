@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/firebase/firebase_runtime.dart';
 import '../../core/theme/app_theme.dart';
+import '../../features/auth/data/auth_service.dart';
+import '../../features/notifications/data/notifications_repository.dart';
+import '../models/notification_model.dart';
 import '../responsive/responsive_builder.dart';
 
-class MainLayout extends StatelessWidget {
+class MainLayout extends ConsumerWidget {
   const MainLayout({super.key, required this.child});
 
   final Widget child;
@@ -16,12 +21,17 @@ class MainLayout extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ResponsiveBuilder(
       builder: (context, size) {
         final isDesktop = size == ResponsiveSize.desktop;
         return Scaffold(
-          appBar: isDesktop ? null : AppBar(title: const _Brand()),
+          appBar: isDesktop
+              ? null
+              : AppBar(
+                  title: const _Brand(),
+                  actions: const [_NotificationsBell()],
+                ),
           drawer: isDesktop ? null : const Drawer(child: _MobileNavigation()),
           body: Column(
             children: [
@@ -35,11 +45,11 @@ class MainLayout extends StatelessWidget {
   }
 }
 
-class _DesktopNavigation extends StatelessWidget {
+class _DesktopNavigation extends ConsumerWidget {
   const _DesktopNavigation();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       height: 76,
       decoration: const BoxDecoration(
@@ -65,6 +75,8 @@ class _DesktopNavigation extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
+                const _NotificationsBell(),
+                const SizedBox(width: 8),
                 TextButton(
                   onPressed: () => context.go('/login'),
                   child: const Text('تسجيل الدخول'),
@@ -80,6 +92,108 @@ class _DesktopNavigation extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _NotificationsBell extends ConsumerWidget {
+  const _NotificationsBell();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final runtime = ref.watch(firebaseRuntimeProvider);
+    if (!runtime.isReady) return const SizedBox.shrink();
+    final auth = ref.watch(authStateProvider);
+    return auth.when(
+      loading: () => const SizedBox(width: 44),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (user) {
+        if (user == null) return const SizedBox.shrink();
+        final repository = ref.read(notificationsRepositoryProvider);
+        return StreamBuilder<List<NotificationModel>>(
+          stream: repository.watchCurrentUserNotifications(),
+          builder: (context, snapshot) {
+            final notifications = snapshot.data ?? const <NotificationModel>[];
+            final unreadCount = notifications
+                .where((notification) => !notification.isRead)
+                .length;
+            return Badge.count(
+              count: unreadCount,
+              isLabelVisible: unreadCount > 0,
+              alignment: AlignmentDirectional.topStart,
+              child: PopupMenuButton<NotificationModel>(
+                tooltip: 'الإشعارات',
+                icon: const Icon(Icons.notifications_none_outlined),
+                onSelected: (notification) async {
+                  try {
+                    await repository.markAsRead(notification);
+                  } catch (error) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text('$error')));
+                    }
+                  }
+                },
+                itemBuilder: (context) {
+                  if (snapshot.hasError) {
+                    return const [
+                      PopupMenuItem<NotificationModel>(
+                        enabled: false,
+                        child: SizedBox(
+                          width: 260,
+                          child: Text('تعذر تحميل الإشعارات حاليًا.'),
+                        ),
+                      ),
+                    ];
+                  }
+                  if (notifications.isEmpty) {
+                    return const [
+                      PopupMenuItem<NotificationModel>(
+                        enabled: false,
+                        child: SizedBox(
+                          width: 260,
+                          child: Text('لا توجد إشعارات جديدة.'),
+                        ),
+                      ),
+                    ];
+                  }
+                  return notifications
+                      .map(
+                        (notification) => PopupMenuItem<NotificationModel>(
+                          value: notification,
+                          child: SizedBox(
+                            width: 280,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  notification.title,
+                                  style: TextStyle(
+                                    fontWeight: notification.isRead
+                                        ? FontWeight.w600
+                                        : FontWeight.w900,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  notification.message,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(growable: false);
+                },
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

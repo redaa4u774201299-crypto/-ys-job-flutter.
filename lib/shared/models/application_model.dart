@@ -16,6 +16,14 @@ enum ApplicationStatus {
     'rejected' => ApplicationStatus.rejected,
     _ => ApplicationStatus.pending,
   };
+
+  String get arabicLabel => switch (this) {
+    ApplicationStatus.pending => 'قيد المراجعة',
+    ApplicationStatus.viewed => 'تمت المراجعة',
+    ApplicationStatus.interview => 'مقبول لمقابلة',
+    ApplicationStatus.accepted => 'تم القبول',
+    ApplicationStatus.rejected => 'لم يتم القبول',
+  };
 }
 
 class ApplicationModel {

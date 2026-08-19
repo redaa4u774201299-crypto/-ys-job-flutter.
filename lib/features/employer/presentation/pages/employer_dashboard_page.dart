@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/firebase/firebase_runtime.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/auth/data/auth_service.dart';
+import '../../../../features/employer/data/feature_requests_repository.dart';
 import '../../../../features/jobs/data/jobs_repository.dart';
 import '../../../../features/jobs/presentation/widgets/firebase_setup_state.dart';
 import '../../../../features/seeker/data/applications_repository.dart';
@@ -202,7 +203,7 @@ class _JobsTable extends StatelessWidget {
                   DataCell(Text(job.location)),
                   DataCell(Text(job.jobType)),
                   DataCell(_StatusChip(status: job.status)),
-                  DataCell(_StatusAction(job: job, ref: ref)),
+                  DataCell(_JobActions(job: job, ref: ref)),
                 ],
               ),
             )
@@ -235,7 +236,7 @@ class _JobsCards extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _StatusChip(status: job.status),
-                    _StatusAction(job: job, ref: ref),
+                    _JobActions(job: job, ref: ref),
                   ],
                 ),
               ),
@@ -246,30 +247,84 @@ class _JobsCards extends StatelessWidget {
   );
 }
 
-class _StatusAction extends StatelessWidget {
-  const _StatusAction({required this.job, required this.ref});
+class _JobActions extends StatelessWidget {
+  const _JobActions({required this.job, required this.ref});
   final JobModel job;
   final WidgetRef ref;
 
   @override
-  Widget build(BuildContext context) => TextButton(
-    onPressed: () async {
-      try {
-        await ref
-            .read(jobsRepositoryProvider)
-            .updateJobStatus(
-              jobId: job.id,
-              status: job.isActive ? JobStatus.closed : JobStatus.active,
-            );
-      } catch (_) {
-        if (context.mounted)
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تعذر تحديث حالة الوظيفة.')),
-          );
-      }
-    },
-    child: Text(job.isActive ? 'إغلاق' : 'إعادة تفعيل'),
+  Widget build(BuildContext context) => Wrap(
+    spacing: 6,
+    runSpacing: 6,
+    children: [
+      TextButton(
+        onPressed: () async {
+          try {
+            await ref
+                .read(jobsRepositoryProvider)
+                .updateJobStatus(
+                  jobId: job.id,
+                  status: job.isActive ? JobStatus.closed : JobStatus.active,
+                );
+          } catch (_) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('تعذر تحديث حالة الوظيفة.')),
+              );
+            }
+          }
+        },
+        child: Text(job.isActive ? 'إغلاق' : 'إعادة تفعيل'),
+      ),
+      if (job.isFeatured)
+        const Chip(label: Text('مميزة'))
+      else
+        OutlinedButton(
+          onPressed: () => _requestFeature(context),
+          child: const Text('ترقية إلى وظيفة مميزة'),
+        ),
+    ],
   );
+
+  Future<void> _requestFeature(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('ترقية إلى وظيفة مميزة'),
+        content: const Text(
+          'ستظهر الوظيفة المميزة في مواضع بارزة من نتائج البحث. لإتمام التمييز، '
+          'سدّد الرسوم عبر التحويل البنكي أو المحفظة الإلكترونية وفق وسيلة الدفع '
+          'المتفق عليها، ثم تواصل مع الإدارة. إرسال الطلب لا يفعّل التمييز تلقائيًا.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('تأكيد إرسال الطلب للإدارة'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await ref.read(featureRequestsRepositoryProvider).requestFeature(job);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('أُرسل الطلب للإدارة وهو قيد المراجعة.'),
+          ),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
+  }
 }
 
 class _StatusChip extends StatelessWidget {

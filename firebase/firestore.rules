@@ -1,0 +1,183 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function hasProfile() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function currentProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isActiveUser() {
+      return hasProfile() && currentProfile().data.isActive == true;
+    }
+
+    function isAdmin() {
+      return isActiveUser() && currentProfile().data.role == 'admin';
+    }
+
+    function isEmployer() {
+      return isActiveUser() && currentProfile().data.role == 'employer';
+    }
+
+    function job(jobId) {
+      return get(/databases/$(database)/documents/jobs/$(jobId));
+    }
+
+    function application(applicationId) {
+      return get(
+        /databases/$(database)/documents/applications/$(applicationId)
+      );
+    }
+
+    function applicationAfter(applicationId) {
+      return getAfter(
+        /databases/$(database)/documents/applications/$(applicationId)
+      );
+    }
+
+    match /users/{userId} {
+      allow get, list: if isAdmin() ||
+        (signedIn() && request.auth.uid == userId);
+
+      // يمنع التسجيل العام من إنشاء حساب إداري أو تعيين حالة غير نشطة.
+      allow create: if isAdmin() ||
+        (
+          signedIn() &&
+          request.auth.uid == userId &&
+          request.resource.data.id == userId &&
+          request.resource.data.role in ['seeker', 'employer'] &&
+          request.resource.data.isActive == true
+        );
+
+      // يبقى الدور والحالة ومعرف الحساب وتاريخ إنشائه حقولًا إدارية غير قابلة
+      // للتغيير ذاتيًا؛ يمكن للمستخدم تعديل ملفه المهني فقط.
+      allow update: if isAdmin() ||
+        (
+          signedIn() &&
+          request.auth.uid == userId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'email', 'bio', 'skills', 'resumeUrl'
+          ])
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /jobs/{jobId} {
+      // جميع الزوار يمكنهم استكشاف الوظائف العامة؛ يجب أن يخفي التطبيق ما كانت
+      // حالته hidden من الواجهة العامة.
+      allow get, list: if true;
+
+      allow create: if isEmployer() &&
+        request.resource.data.id == jobId &&
+        request.resource.data.employerId == request.auth.uid &&
+        request.resource.data.isFeatured == false;
+
+      // صاحب الوظيفة لا يغير المالك ولا يفعّل التمييز بنفسه.
+      allow update: if isAdmin() ||
+        (
+          isEmployer() &&
+          resource.data.employerId == request.auth.uid &&
+          request.resource.data.employerId == resource.data.employerId &&
+          request.resource.data.isFeatured == resource.data.isFeatured
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /applications/{applicationId} {
+      allow get, list: if isAdmin() ||
+        (
+          isActiveUser() && resource.data.seekerId == request.auth.uid
+        ) ||
+        (
+          isEmployer() && resource.data.employerId == request.auth.uid
+        );
+
+      // لا يسمح إلا للباحث بإنشاء طلبه، مع مطابقة صاحب الوظيفة وحالة pending.
+      allow create: if isActiveUser() &&
+        currentProfile().data.role == 'seeker' &&
+        request.resource.data.id == applicationId &&
+        request.resource.data.seekerId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)) &&
+        job(request.resource.data.jobId).data.employerId ==
+          request.resource.data.employerId &&
+        request.resource.data.employerId != request.auth.uid &&
+        job(request.resource.data.jobId).data.status == 'active';
+
+      // صاحب الشركة يغير حالة الطلب فقط، ولا يمكنه تبديل الباحث أو الوظيفة أو المالك.
+      allow update: if isAdmin() ||
+        (
+          isEmployer() &&
+          resource.data.employerId == request.auth.uid &&
+          request.resource.data.jobId == resource.data.jobId &&
+          request.resource.data.seekerId == resource.data.seekerId &&
+          request.resource.data.employerId == resource.data.employerId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status'
+          ])
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow get, list: if isAdmin() ||
+        (signedIn() && resource.data.userId == request.auth.uid);
+
+      // يُسمح لصاحب الشركة بإنشاء إشعار واحد مرتبط بتحديث حالة طلب يخص وظيفته
+      // ضمن نفس batch؛ يمنع ذلك إنشاء إشعارات عشوائية لمستخدمين آخرين.
+      allow create: if isAdmin() ||
+        (
+          isEmployer() &&
+          request.resource.data.id == notificationId &&
+          request.resource.data.isRead == false &&
+          application(request.resource.data.applicationId).data.employerId ==
+            request.auth.uid &&
+          request.resource.data.userId ==
+            applicationAfter(request.resource.data.applicationId).data.seekerId &&
+          applicationAfter(request.resource.data.applicationId).data.status !=
+            application(request.resource.data.applicationId).data.status
+        );
+
+      // مستقبل الإشعار يمكنه تغيير isRead فقط؛ بقية الحقول ثابتة.
+      allow update: if isAdmin() ||
+        (
+          signedIn() &&
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'isRead'
+          ])
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /feature_requests/{requestId} {
+      allow get, list: if isAdmin() ||
+        (
+          isEmployer() && resource.data.employerId == request.auth.uid
+        );
+
+      // صاحب الوظيفة يقدم طلب مراجعة يدوي فقط؛ لا يمكنه تعيين الوظيفة مميزة هنا.
+      allow create: if isEmployer() &&
+        request.resource.data.id == requestId &&
+        request.resource.data.employerId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)) &&
+        job(request.resource.data.jobId).data.employerId == request.auth.uid &&
+        job(request.resource.data.jobId).data.isFeatured == false;
+
+      allow update, delete: if isAdmin();
+    }
+  }
+}

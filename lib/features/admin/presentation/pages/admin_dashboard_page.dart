@@ -75,6 +75,11 @@ class AdminDashboardPage extends ConsumerWidget {
                       icon: const Icon(Icons.fact_check_outlined),
                       label: const Text('مراجعة الوظائف'),
                     ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/admin/feature-requests'),
+                      icon: const Icon(Icons.workspace_premium_outlined),
+                      label: const Text('طلبات التمييز'),
+                    ),
                   ],
                 ),
               ],
