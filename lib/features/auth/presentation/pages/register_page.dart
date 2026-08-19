@@ -4,32 +4,38 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/firebase/firebase_runtime.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/models/user_model.dart';
 import '../../../jobs/presentation/widgets/firebase_setup_state.dart';
 import '../../domain/auth_service.dart';
 import '../widgets/auth_layout.dart';
 
-class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({super.key});
+class RegisterPage extends ConsumerStatefulWidget {
+  const RegisterPage({super.key});
 
   @override
-  ConsumerState<LoginPage> createState() => _LoginPageState();
+  ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _LoginPageState extends ConsumerState<LoginPage> {
+class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  UserRole _role = UserRole.seeker;
   bool _isBusy = false;
   String? _errorMessage;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _isBusy = true;
@@ -38,25 +44,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     try {
       final session = await ref
           .read(authServiceProvider)
-          .loginUser(
+          .registerUser(
+            name: _nameController.text,
             email: _emailController.text,
             password: _passwordController.text,
+            role: _role,
           );
-      if (mounted) context.go(session.destination);
-    } catch (error) {
-      if (mounted) setState(() => _errorMessage = authFailureMessage(error));
-    } finally {
-      if (mounted) setState(() => _isBusy = false);
-    }
-  }
-
-  Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isBusy = true;
-      _errorMessage = null;
-    });
-    try {
-      final session = await ref.read(authServiceProvider).signInWithGoogle();
       if (mounted) context.go(session.destination);
     } catch (error) {
       if (mounted) setState(() => _errorMessage = authFailureMessage(error));
@@ -74,26 +67,64 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.lock_outline, color: AppColors.gold, size: 44),
+              const Icon(
+                Icons.person_add_alt_1_outlined,
+                color: AppColors.gold,
+                size: 44,
+              ),
               const SizedBox(height: 18),
               Text(
-                'تسجيل الدخول',
+                'أنشئ حسابك',
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall
                     ?.copyWith(fontWeight: FontWeight.w900),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               if (!runtime.isReady)
                 FirebaseSetupState(message: runtime.message)
               else ...[
                 const Text(
-                  'سجّل دخولك للوصول إلى مزايا YS.JOB. تُحفظ الجلسة على هذا المتصفح عبر Firebase Auth.',
+                  'اختر نوع الحساب ثم أدخل بياناتك. سيُحفظ الدور في ملفك داخل Firestore.',
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 22),
+                SegmentedButton<UserRole>(
+                  segments: const [
+                    ButtonSegment(
+                      value: UserRole.seeker,
+                      label: Text('باحث عن عمل'),
+                      icon: Icon(Icons.person_search_outlined),
+                    ),
+                    ButtonSegment(
+                      value: UserRole.employer,
+                      label: Text('صاحب شركة'),
+                      icon: Icon(Icons.business_outlined),
+                    ),
+                  ],
+                  selected: {_role},
+                  onSelectionChanged: _isBusy
+                      ? null
+                      : (roles) => setState(() => _role = roles.first),
+                ),
+                const SizedBox(height: 22),
                 Form(
                   key: _formKey,
                   child: Column(
                     children: [
+                      TextFormField(
+                        controller: _nameController,
+                        enabled: !_isBusy,
+                        autofillHints: const [AutofillHints.name],
+                        decoration: const InputDecoration(
+                          labelText: 'الاسم الكامل',
+                        ),
+                        validator: (value) => value?.trim().isEmpty ?? true
+                            ? 'الاسم مطلوب.'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
                       TextFormField(
                         controller: _emailController,
                         enabled: !_isBusy,
@@ -109,12 +140,25 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         controller: _passwordController,
                         enabled: !_isBusy,
                         obscureText: true,
-                        autofillHints: const [AutofillHints.password],
-                        onFieldSubmitted: (_) => _submit(),
+                        autofillHints: const [AutofillHints.newPassword],
                         decoration: const InputDecoration(
                           labelText: 'كلمة المرور',
                         ),
                         validator: _passwordValidator,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        enabled: !_isBusy,
+                        obscureText: true,
+                        autofillHints: const [AutofillHints.newPassword],
+                        onFieldSubmitted: (_) => _register(),
+                        decoration: const InputDecoration(
+                          labelText: 'تأكيد كلمة المرور',
+                        ),
+                        validator: (value) => value != _passwordController.text
+                            ? 'كلمتا المرور غير متطابقتين.'
+                            : null,
                       ),
                     ],
                   ),
@@ -123,30 +167,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   const SizedBox(height: 12),
                   Text(
                     _errorMessage!,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.red),
                   ),
                 ],
                 const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isBusy ? null : _submit,
-                    child: Text(_isBusy ? 'جارٍ التحقق...' : 'تسجيل الدخول'),
+                ElevatedButton(
+                  onPressed: _isBusy ? null : _register,
+                  child: Text(
+                    _isBusy ? 'جارٍ إنشاء الحساب...' : 'إنشاء الحساب',
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 TextButton(
-                  onPressed: _isBusy ? null : () => context.go('/register'),
-                  child: const Text('ليس لديك حساب؟ أنشئ حسابًا جديدًا'),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton.icon(
-                    onPressed: _isBusy ? null : _signInWithGoogle,
-                    icon: const Icon(Icons.login),
-                    label: const Text('المتابعة باستخدام Google'),
-                  ),
+                  onPressed: _isBusy ? null : () => context.go('/login'),
+                  child: const Text('لديك حساب بالفعل؟ سجّل الدخول'),
                 ),
               ],
             ],
