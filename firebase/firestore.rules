@@ -64,7 +64,16 @@ service cloud.firestore {
           signedIn() &&
           request.auth.uid == userId &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'email', 'bio', 'skills', 'resumeUrl'
+            'name',
+            'email',
+            'bio',
+            'skills',
+            'resumeUrl',
+            'phone',
+            'photoUrl',
+            'industry',
+            'companyName',
+            'jobTitle'
           ])
         );
 

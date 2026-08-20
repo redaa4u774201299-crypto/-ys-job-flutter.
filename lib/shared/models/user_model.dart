@@ -30,6 +30,11 @@ class UserModel {
     this.bio = '',
     this.skills = const [],
     this.resumeUrl = '',
+    this.phone = '',
+    this.photoUrl = '',
+    this.industry = '',
+    this.companyName = '',
+    this.jobTitle = '',
     this.isActive = true,
   });
 
@@ -41,6 +46,11 @@ class UserModel {
   final String bio;
   final List<String> skills;
   final String resumeUrl;
+  final String phone;
+  final String photoUrl;
+  final String industry;
+  final String companyName;
+  final String jobTitle;
   final bool isActive;
 
   UserModel copyWith({
@@ -52,6 +62,11 @@ class UserModel {
     String? bio,
     List<String>? skills,
     String? resumeUrl,
+    String? phone,
+    String? photoUrl,
+    String? industry,
+    String? companyName,
+    String? jobTitle,
     bool? isActive,
   }) => UserModel(
     id: id ?? this.id,
@@ -62,6 +77,11 @@ class UserModel {
     bio: bio ?? this.bio,
     skills: skills ?? this.skills,
     resumeUrl: resumeUrl ?? this.resumeUrl,
+    phone: phone ?? this.phone,
+    photoUrl: photoUrl ?? this.photoUrl,
+    industry: industry ?? this.industry,
+    companyName: companyName ?? this.companyName,
+    jobTitle: jobTitle ?? this.jobTitle,
     isActive: isActive ?? this.isActive,
   );
 
@@ -74,6 +94,11 @@ class UserModel {
     'bio': bio,
     'skills': skills,
     'resumeUrl': resumeUrl,
+    'phone': phone,
+    'photoUrl': photoUrl,
+    'industry': industry,
+    'companyName': companyName,
+    'jobTitle': jobTitle,
     'isActive': isActive,
   };
 
@@ -88,6 +113,11 @@ class UserModel {
     bio: _asText(json['bio']),
     skills: _asTextList(json['skills']),
     resumeUrl: _asText(json['resumeUrl']),
+    phone: _asText(json['phone']),
+    photoUrl: _asText(json['photoUrl']),
+    industry: _asText(json['industry']),
+    companyName: _asText(json['companyName']),
+    jobTitle: _asText(json['jobTitle']),
     isActive: json['isActive'] != false,
   );
 
@@ -100,6 +130,11 @@ class UserModel {
     'bio': bio,
     'skills': skills,
     'resumeUrl': resumeUrl,
+    'phone': phone,
+    'photoUrl': photoUrl,
+    'industry': industry,
+    'companyName': companyName,
+    'jobTitle': jobTitle,
     'isActive': isActive,
   };
 

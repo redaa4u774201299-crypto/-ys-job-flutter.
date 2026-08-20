@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/firebase/firebase_runtime.dart';
 import '../../../../features/auth/data/auth_service.dart';
@@ -144,6 +145,8 @@ class _ApplicantCard extends ConsumerWidget {
     final seekerEmail = seeker?.email.trim().isNotEmpty == true
         ? seeker!.email
         : 'بيانات البريد غير متاحة';
+    final resumeUrl = seeker?.resumeUrl.trim() ?? '';
+    final photoUrl = seeker?.photoUrl.trim() ?? '';
 
     return Card(
       child: Padding(
@@ -154,7 +157,14 @@ class _ApplicantCard extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(child: Icon(Icons.person_outline)),
+                CircleAvatar(
+                  backgroundImage: photoUrl.isEmpty
+                      ? null
+                      : NetworkImage(photoUrl),
+                  child: photoUrl.isEmpty
+                      ? const Icon(Icons.person_outline)
+                      : null,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -167,6 +177,13 @@ class _ApplicantCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(seekerEmail),
+                      if (seeker?.jobTitle.trim().isNotEmpty == true) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          seeker!.jobTitle,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Text(
                         'تاريخ التقديم: ${_formatDate(application.appliedAt)}',
@@ -179,6 +196,14 @@ class _ApplicantCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
+            if (resumeUrl.isNotEmpty) ...[
+              OutlinedButton.icon(
+                onPressed: () => _openResume(context, resumeUrl),
+                icon: const Icon(Icons.download_outlined),
+                label: const Text('تحميل السيرة الذاتية'),
+              ),
+              const SizedBox(height: 16),
+            ],
             DropdownButtonFormField<ApplicationStatus>(
               initialValue: application.status,
               decoration: const InputDecoration(
@@ -221,6 +246,22 @@ class _ApplicantCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _openResume(BuildContext context, String resumeUrl) async {
+    final uri = Uri.tryParse(resumeUrl);
+    if (uri == null || !uri.hasScheme) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('رابط السيرة الذاتية غير صالح.')),
+      );
+      return;
+    }
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر فتح رابط السيرة الذاتية.')),
+      );
+    }
   }
 }
 

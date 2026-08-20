@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedInAndActive() {
+      return request.auth != null &&
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isActive == true;
+    }
+
+    function ownsFolder(userId) {
+      return signedInAndActive() && request.auth.uid == userId;
+    }
+
+    match /photos/{userId}/{fileName} {
+      allow read: if ownsFolder(userId);
+      allow create, update: if ownsFolder(userId) &&
+        request.resource.size <= 2 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|png)');
+      allow delete: if ownsFolder(userId);
+    }
+
+    match /logos/{userId}/{fileName} {
+      allow read: if ownsFolder(userId);
+      allow create, update: if ownsFolder(userId) &&
+        request.resource.size <= 2 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|png)');
+      allow delete: if ownsFolder(userId);
+    }
+
+    match /resumes/{userId}/{fileName} {
+      allow read, delete: if ownsFolder(userId);
+      allow create, update: if ownsFolder(userId) &&
+        request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType == 'application/pdf';
+    }
+  }
+}
