@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/firebase/firebase_runtime.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/auth/data/auth_service.dart';
 import '../../../../features/employer/data/feature_requests_repository.dart';
@@ -136,7 +137,7 @@ class _EmployerDashboard extends ConsumerWidget {
                         ),
                       ),
                       ElevatedButton.icon(
-                        onPressed: () => context.go('/employer/post-job'),
+                        onPressed: () => context.go(AppRoutes.addJob),
                         icon: const Icon(Icons.add),
                         label: const Text('إضافة وظيفة جديدة'),
                       ),

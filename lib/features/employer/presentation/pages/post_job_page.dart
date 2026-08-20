@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/firebase/firebase_runtime.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../features/auth/data/auth_service.dart';
 import '../../../../features/jobs/data/jobs_repository.dart';
 import '../../../../features/jobs/presentation/widgets/firebase_setup_state.dart';
@@ -30,10 +31,14 @@ class PostJobPage extends ConsumerWidget {
               builder: (context, snapshot) {
                 if (!snapshot.hasData)
                   return const Center(child: CircularProgressIndicator());
-                if (snapshot.data!.role != UserRole.employer)
+                final profile = snapshot.data;
+                if (profile == null ||
+                    profile.role != UserRole.employer ||
+                    !profile.isActive) {
                   return const _PostJobNotice(
                     'نشر الوظائف متاح لحسابات أصحاب الشركات فقط.',
                   );
+                }
                 return const _PostJobForm();
               },
             );
@@ -83,10 +88,16 @@ class _PostJobFormState extends ConsumerState<_PostJobForm> {
             location: _location.text,
           );
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('نُشرت الوظيفة بنجاح.')));
-        context.go('/employer-dashboard');
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'نُشرت الوظيفة بنجاح، ويمكنك الآن إدارة طلبات التقديم.',
+              ),
+            ),
+          );
+        context.go(AppRoutes.employerDashboard);
       }
     } catch (error) {
       if (mounted)
@@ -136,12 +147,20 @@ class _PostJobFormState extends ConsumerState<_PostJobForm> {
                     items: const [
                       DropdownMenuItem(value: 'كامل', child: Text('دوام كامل')),
                       DropdownMenuItem(value: 'جزئي', child: Text('دوام جزئي')),
+                      DropdownMenuItem(
+                        value: 'عن بُعد',
+                        child: Text('عن بُعد'),
+                      ),
                     ],
                     onChanged: (value) =>
                         setState(() => _jobType = value ?? _jobType),
                   ),
                   const SizedBox(height: 14),
-                  _Input(controller: _salary, label: 'نطاق الراتب'),
+                  _Input(
+                    controller: _salary,
+                    label: 'نطاق الراتب (اختياري)',
+                    required: false,
+                  ),
                   const SizedBox(height: 14),
                   _Input(controller: _location, label: 'الموقع'),
                   const SizedBox(height: 24),
@@ -164,17 +183,20 @@ class _Input extends StatelessWidget {
     required this.controller,
     required this.label,
     this.maxLines = 1,
+    this.required = true,
   });
   final TextEditingController controller;
   final String label;
   final int maxLines;
+  final bool required;
   @override
   Widget build(BuildContext context) => TextFormField(
     controller: controller,
     maxLines: maxLines,
     decoration: InputDecoration(labelText: label),
-    validator: (value) =>
-        value == null || value.trim().isEmpty ? '$label مطلوب' : null,
+    validator: (value) => required && (value == null || value.trim().isEmpty)
+        ? '$label مطلوب'
+        : null,
   );
 }
 

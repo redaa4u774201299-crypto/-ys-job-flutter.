@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_routes.dart';
 import '../../auth/data/auth_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/user_model.dart';
@@ -112,12 +113,12 @@ class _EmployerDrawer extends ConsumerWidget {
             _DrawerLink(
               label: 'لوحة التحكم',
               icon: Icons.dashboard_outlined,
-              path: '/employer-dashboard',
+              path: AppRoutes.employerDashboard,
             ),
             _DrawerLink(
               label: 'إضافة وظيفة جديدة',
               icon: Icons.add_circle_outline,
-              path: '/employer/post-job',
+              path: AppRoutes.addJob,
             ),
             _DrawerLink(
               label: 'استعراض الوظائف',

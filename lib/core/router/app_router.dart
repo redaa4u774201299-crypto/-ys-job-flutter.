@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'app_routes.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/admin/presentation/pages/admin_dashboard_page.dart';
@@ -31,12 +32,17 @@ final appRouterProvider = Provider<GoRouter>(
         builder: (context, state, child) => EmployerLayout(child: child),
         routes: [
           GoRoute(
-            path: '/employer-dashboard',
+            path: AppRoutes.employerDashboard,
             builder: (context, state) => const EmployerDashboardPage(),
           ),
           GoRoute(
-            path: '/employer/post-job',
+            path: AppRoutes.addJob,
             builder: (context, state) => const PostJobPage(),
+          ),
+          GoRoute(
+            path: AppRoutes.legacyEmployerPostJob,
+            redirect: (context, state) =>
+                AppRoutes.redirectLegacyEmployerPostJob(state.uri.path),
           ),
           GoRoute(
             path: '/employer/jobs/:id/applications',
