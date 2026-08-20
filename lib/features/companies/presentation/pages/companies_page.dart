@@ -4,36 +4,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/firebase/firebase_runtime.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/models/user_model.dart';
+import '../../../../shared/models/company_directory_entry.dart';
 import '../../../../shared/widgets/base64_thumbnail_avatar.dart';
 import '../company_directory_filters.dart';
 
-final companiesDirectoryProvider = StreamProvider.autoDispose<List<UserModel>>((
-  ref,
-) {
-  final runtime = ref.watch(firebaseRuntimeProvider);
-  if (!runtime.isReady) return Stream.value(const <UserModel>[]);
-  return FirebaseFirestore.instance
-      .collection('users')
-      .where('role', isEqualTo: UserRole.employer.value)
-      .snapshots()
-      .map(
-        (snapshot) =>
-            snapshot.docs
-                .map(UserModel.fromFirestore)
-                .where((company) => company.isActive)
-                .toList(growable: false)
-              ..sort(
-                (first, second) =>
-                    _companyLabel(first).compareTo(_companyLabel(second)),
-              ),
-      );
-});
+final companiesDirectoryProvider =
+    StreamProvider.autoDispose<List<CompanyDirectoryEntry>>((ref) {
+      final runtime = ref.watch(firebaseRuntimeProvider);
+      if (!runtime.isReady)
+        return Stream.value(const <CompanyDirectoryEntry>[]);
+      return FirebaseFirestore.instance
+          .collection('company_directory')
+          .snapshots()
+          .map(
+            (snapshot) =>
+                snapshot.docs
+                    .map(CompanyDirectoryEntry.fromFirestore)
+                    .toList(growable: false)
+                  ..sort(
+                    (first, second) =>
+                        _companyLabel(first).compareTo(_companyLabel(second)),
+                  ),
+          );
+    });
 
-String _companyLabel(UserModel company) {
-  final label = company.companyName.trim();
-  return (label.isEmpty ? company.name : label).toLowerCase();
-}
+String _companyLabel(CompanyDirectoryEntry company) =>
+    company.name.toLowerCase();
 
 class CompaniesPage extends ConsumerStatefulWidget {
   const CompaniesPage({super.key});
@@ -149,17 +145,15 @@ class _CompaniesPageState extends ConsumerState<CompaniesPage> {
 class _CompanyCard extends StatelessWidget {
   const _CompanyCard({required this.company});
 
-  final UserModel company;
+  final CompanyDirectoryEntry company;
 
   @override
   Widget build(BuildContext context) {
-    final name = company.companyName.trim().isEmpty
-        ? company.name
-        : company.companyName.trim();
+    final name = company.name;
     return Semantics(
       container: true,
       label:
-          'شركة $name${company.industry.isEmpty ? '' : '، مجال ${company.industry}'}',
+          'شركة $name${company.industry.isEmpty ? '' : '، مجال ${company.industry}'}${company.city.isEmpty ? '' : '، مدينة ${company.city}'}',
       child: Card(
         child: Padding(
           padding: const EdgeInsets.all(18),
@@ -189,10 +183,17 @@ class _CompanyCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Chip(label: Text(company.industry)),
                     ],
-                    if (company.bio.isNotEmpty) ...[
+                    if (company.city.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        company.city,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                    if (company.description.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       Text(
-                        company.bio,
+                        company.description,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                       ),

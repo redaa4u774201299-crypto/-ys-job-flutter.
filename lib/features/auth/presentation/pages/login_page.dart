@@ -66,6 +66,103 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  Future<void> _showPasswordResetDialog() async {
+    final resetFormKey = GlobalKey<FormState>();
+    final resetEmailController = TextEditingController(
+      text: _emailController.text.trim(),
+    );
+    var isSubmitting = false;
+
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              icon: const Icon(Icons.mark_email_read_outlined),
+              title: const Text('استعادة كلمة المرور'),
+              content: Form(
+                key: resetFormKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'أدخل بريدك الإلكتروني وسنرسل لك رابطًا آمنًا لتعيين كلمة مرور جديدة.',
+                    ),
+                    const SizedBox(height: 18),
+                    TextFormField(
+                      controller: resetEmailController,
+                      enabled: !isSubmitting,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.email],
+                      decoration: const InputDecoration(
+                        labelText: 'البريد الإلكتروني',
+                        prefixIcon: Icon(Icons.alternate_email_outlined),
+                      ),
+                      validator: _emailValidator,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('إلغاء'),
+                ),
+                FilledButton.icon(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          if (!resetFormKey.currentState!.validate()) return;
+                          setDialogState(() => isSubmitting = true);
+                          try {
+                            await ref
+                                .read(authServiceProvider)
+                                .sendPasswordResetEmail(
+                                  resetEmailController.text,
+                                );
+                            if (!mounted || !dialogContext.mounted) return;
+                            Navigator.of(dialogContext).pop();
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'إذا كان البريد مرتبطًا بحساب، فستصل إليه رسالة الاستعادة قريبًا.',
+                                ),
+                              ),
+                            );
+                          } catch (error) {
+                            if (!mounted) return;
+                            setDialogState(() => isSubmitting = false);
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(
+                                content: Text(authFailureMessage(error)),
+                              ),
+                            );
+                          }
+                        },
+                  icon: isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send_outlined),
+                  label: const Text('إرسال الرابط'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } finally {
+      resetEmailController.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final runtime = ref.watch(firebaseRuntimeProvider);
@@ -144,6 +241,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             ),
                           ),
                           validator: _passwordValidator,
+                        ),
+                        Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: TextButton(
+                            onPressed: _isBusy
+                                ? null
+                                : _showPasswordResetDialog,
+                            child: const Text('نسيت كلمة المرور؟'),
+                          ),
                         ),
                       ],
                     ),

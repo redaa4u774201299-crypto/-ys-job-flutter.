@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 
 import '../../../core/firebase/firebase_runtime.dart';
+import '../../../shared/models/company_directory_entry.dart';
+import '../../../shared/models/user_model.dart';
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
   final runtime = ref.watch(firebaseRuntimeProvider);
@@ -92,7 +94,7 @@ class ProfileRepository {
     required String bio,
     required String phone,
   }) async {
-    return _savePayload(
+    return _saveEmployerPayload(
       employerProfilePayload(
         name: name,
         companyName: companyName,
@@ -133,7 +135,7 @@ class ProfileRepository {
     ProfileImagePayload logo,
   ) async {
     final user = _requireUser();
-    await _writePayload(user.uid, {
+    await _writeEmployerPayload(user.uid, {
       'logoBase64': logo.fullBase64,
       'logoThumbBase64': logo.thumbnailBase64,
     });
@@ -149,11 +151,52 @@ class ProfileRepository {
     return _confirmPendingWrites();
   }
 
+  Future<ProfileSyncOutcome> _saveEmployerPayload(
+    Map<String, dynamic> payload,
+  ) async {
+    final user = _requireUser();
+    await _writeEmployerPayload(user.uid, payload);
+    return _confirmPendingWrites();
+  }
+
   Future<void> _writePayload(String userId, Map<String, dynamic> payload) {
     return _firestore
         .collection('users')
         .doc(userId)
         .set(payload, SetOptions(merge: true));
+  }
+
+  Future<void> _writeEmployerPayload(
+    String userId,
+    Map<String, dynamic> payload,
+  ) async {
+    final profileReference = _firestore.collection('users').doc(userId);
+    final snapshot = await profileReference.get();
+    if (!snapshot.exists) {
+      throw StateError('تعذر العثور على ملف الشركة الحالي.');
+    }
+
+    final currentData = snapshot.data() ?? const <String, dynamic>{};
+    final profile = UserModel.fromJson({
+      ...currentData,
+      ...payload,
+      'id': userId,
+    });
+    if (profile.role != UserRole.employer) {
+      throw StateError('لا يمكن مزامنة دليل الشركات إلا لحساب صاحب عمل.');
+    }
+
+    final directoryEntry = CompanyDirectoryEntry.fromEmployerProfile(
+      profile,
+      city: currentData['city']?.toString() ?? '',
+    );
+    final batch = _firestore.batch()
+      ..set(profileReference, payload, SetOptions(merge: true))
+      ..set(
+        _firestore.collection('company_directory').doc(userId),
+        directoryEntry.toFirestore(),
+      );
+    await batch.commit();
   }
 
   Future<void> _synchronizeEmployerLogoThumbnail(

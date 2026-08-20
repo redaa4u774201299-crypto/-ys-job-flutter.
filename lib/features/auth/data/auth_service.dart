@@ -126,6 +126,18 @@ class AuthService {
 
   Future<void> signOut() => _auth.signOut();
 
+  /// يرسل Firebase رابطًا آمنًا إلى البريد المسجل لتعيين كلمة مرور جديدة.
+  /// لا يكشف التدفق عن وجود الحساب من عدمه حمايةً من تعداد الحسابات.
+  Future<void> sendPasswordResetEmail(String email) async {
+    final normalizedEmail = normalizedRecoveryEmail(email);
+    try {
+      await _auth.sendPasswordResetEmail(email: normalizedEmail);
+    } on FirebaseAuthException catch (error) {
+      if (error.code == 'user-not-found') return;
+      rethrow;
+    }
+  }
+
   Future<AuthSession> _loadSession(User? firebaseUser) async {
     if (firebaseUser == null) {
       throw StateError('تعذر استعادة جلسة المستخدم. سجل الدخول مجددًا.');
@@ -165,6 +177,14 @@ class AuthService {
   }) {
     if (name.trim().isEmpty) throw const FormatException('الاسم مطلوب.');
     _validateCredentials(email: email, password: password);
+  }
+
+  static String normalizedRecoveryEmail(String email) {
+    final normalizedEmail = email.trim();
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(normalizedEmail)) {
+      throw const FormatException('أدخل بريدًا إلكترونيًا صحيحًا.');
+    }
+    return normalizedEmail;
   }
 }
 

@@ -1,17 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ys_job/features/companies/presentation/company_directory_filters.dart';
-import 'package:ys_job/shared/models/user_model.dart';
+import 'package:ys_job/shared/models/company_directory_entry.dart';
 
 void main() {
-  final company = UserModel(
+  final company = CompanyDirectoryEntry(
     id: 'company-1',
-    name: 'شركة الأفق',
-    companyName: 'الأفق للتقنية',
-    email: 'company@example.com',
-    role: UserRole.employer,
-    createdAt: DateTime.utc(2026),
+    name: 'الأفق للتقنية',
     industry: 'تقنية المعلومات',
-    bio: 'تطوّر حلولًا رقمية للشركات.',
+    description: 'تطوّر حلولًا رقمية للشركات.',
+    logoThumbBase64: '',
+    city: 'صنعاء',
   );
 
   group('فلتر دليل الشركات', () {
@@ -19,10 +17,11 @@ void main() {
       expect(matchesCompanyDirectoryQuery(company, '   '), isTrue);
     });
 
-    test('يبحث في اسم الشركة واسم الحساب ومجال العمل والوصف', () {
+    test('يبحث في اسم الشركة ومجال العمل والوصف والمدينة', () {
       expect(matchesCompanyDirectoryQuery(company, 'الأفق'), isTrue);
       expect(matchesCompanyDirectoryQuery(company, 'تقنية'), isTrue);
       expect(matchesCompanyDirectoryQuery(company, 'رقمية'), isTrue);
+      expect(matchesCompanyDirectoryQuery(company, 'صنعاء'), isTrue);
       expect(matchesCompanyDirectoryQuery(company, 'محاسبة'), isFalse);
     });
   });
