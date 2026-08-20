@@ -19,6 +19,17 @@ class JobFilters {
   final String query;
   final String jobType;
   final String location;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is JobFilters &&
+          other.query == query &&
+          other.jobType == jobType &&
+          other.location == location;
+
+  @override
+  int get hashCode => Object.hash(query, jobType, location);
 }
 
 class JobsRepository {

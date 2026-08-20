@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/firebase/firebase_runtime.dart';
+import '../../../../features/auth/data/auth_service.dart';
 import '../../data/jobs_repository.dart';
-import '../../../../shared/models/job_model.dart';
 import '../../../../shared/responsive/responsive_builder.dart';
 import '../widgets/firebase_setup_state.dart';
 import '../widgets/job_summary_card.dart';
+import '../jobs_providers.dart';
 
 class JobsPage extends ConsumerStatefulWidget {
   const JobsPage({super.key, this.query});
@@ -50,6 +52,44 @@ class _JobsPageState extends ConsumerState<JobsPage> {
     }
     return ResponsiveBuilder(
       builder: (context, size) => Scaffold(
+        appBar: AppBar(
+          titleSpacing: 16,
+          title: TextField(
+            controller: _queryController,
+            onChanged: (_) => _refresh(),
+            textInputAction: TextInputAction.search,
+            decoration: const InputDecoration(
+              hintText: 'ابحث عن وظيفة أو شركة',
+              prefixIcon: Icon(Icons.search),
+              filled: true,
+            ),
+          ),
+          actions: [
+            IconButton(
+              onPressed: () => _showFilters(context),
+              tooltip: 'تصفية الوظائف',
+              icon: const Icon(Icons.tune_outlined),
+            ),
+            ref
+                .watch(authStateProvider)
+                .when(
+                  loading: () => const SizedBox(width: 48),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (user) => IconButton(
+                    onPressed: () async {
+                      if (user == null) {
+                        context.go('/login');
+                        return;
+                      }
+                      await ref.read(authServiceProvider).signOut();
+                      if (context.mounted) context.go('/login');
+                    },
+                    tooltip: user == null ? 'تسجيل الدخول' : 'تسجيل الخروج',
+                    icon: Icon(user == null ? Icons.login : Icons.logout),
+                  ),
+                ),
+          ],
+        ),
         floatingActionButton: size == ResponsiveSize.mobile
             ? FloatingActionButton.extended(
                 onPressed: () => _showFilters(context),
@@ -65,16 +105,10 @@ class _JobsPageState extends ConsumerState<JobsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'استكشف الوظائف',
-                    style: Theme.of(context).textTheme.headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 6),
                   const Text(
                     'تظهر الوظائف النشطة المنشورة فعليًا في Firestore فقط.',
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 16),
                   Expanded(
                     child: size == ResponsiveSize.desktop
                         ? Row(
@@ -177,6 +211,7 @@ class _FiltersPanel extends StatelessWidget {
               DropdownMenuItem(value: '', child: Text('كل الأنواع')),
               DropdownMenuItem(value: 'كامل', child: Text('دوام كامل')),
               DropdownMenuItem(value: 'جزئي', child: Text('دوام جزئي')),
+              DropdownMenuItem(value: 'عن بُعد', child: Text('عن بُعد')),
             ],
             onChanged: (value) {
               onTypeChanged(value ?? '');
@@ -213,34 +248,31 @@ class _JobsStream extends ConsumerWidget {
   final JobFilters filters;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      StreamBuilder<List<JobModel>>(
-        stream: ref.read(jobsRepositoryProvider).watchAvailableJobs(filters),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Center(
-              child: Text('تعذر تحميل الوظائف. تحقق من قواعد Firestore.'),
-            );
-          }
-          if (!snapshot.hasData)
-            return const Center(child: CircularProgressIndicator());
-          final jobs = snapshot.data!;
-          if (jobs.isEmpty) {
-            return const Center(
-              child: Text('لا توجد وظائف تطابق معايير البحث الحالية.'),
-            );
-          }
-          return ListView.separated(
-            itemCount: jobs.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final job = jobs[index];
-              return JobSummaryCard(
-                job: job,
-                onTap: () => context.go('/job/${job.id}'),
-              );
-            },
+  Widget build(BuildContext context, WidgetRef ref) {
+    final jobsState = ref.watch(availableJobsProvider(filters));
+    return jobsState.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const Center(
+        child: Text('تعذر تحميل الوظائف. تحقق من قواعد Firestore.'),
+      ),
+      data: (jobs) {
+        if (jobs.isEmpty) {
+          return const Center(
+            child: Text('لا توجد وظائف تطابق معايير البحث الحالية.'),
           );
-        },
-      );
+        }
+        return ListView.separated(
+          itemCount: jobs.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final job = jobs[index];
+            return JobSummaryCard(
+              job: job,
+              onTap: () => context.go(AppRoutes.jobDetails(job.id)),
+            );
+          },
+        );
+      },
+    );
+  }
 }

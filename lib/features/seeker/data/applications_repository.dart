@@ -31,16 +31,37 @@ class ApplicationsRepository {
     if (seeker.uid == job.employerId) {
       throw StateError('لا يمكن لصاحب الوظيفة التقديم عليها.');
     }
+    final seekerProfile = await _firestore
+        .collection('users')
+        .doc(seeker.uid)
+        .get();
+    final profileData = seekerProfile.data();
+    if (!seekerProfile.exists ||
+        profileData?['role'] != 'seeker' ||
+        profileData?['isActive'] == false) {
+      throw StateError('التقديم متاح لحساب الباحث النشط فقط.');
+    }
+
     final id = '${job.id}_${seeker.uid}';
     final reference = _firestore.collection('applications').doc(id);
+    final jobReference = _firestore.collection('jobs').doc(job.id);
     await _firestore.runTransaction((transaction) async {
+      final jobSnapshot = await transaction.get(jobReference);
+      if (!jobSnapshot.exists ||
+          jobSnapshot.data()?['status'] != JobStatus.active.value) {
+        throw StateError('هذه الوظيفة لم تعد متاحة للتقديم.');
+      }
       final existing = await transaction.get(reference);
       if (existing.exists) throw StateError('لقد قدمت على هذه الوظيفة مسبقًا.');
+      final employerId = jobSnapshot.data()?['employerId']?.toString() ?? '';
+      if (employerId.isEmpty) {
+        throw StateError('تعذر التحقق من صاحب الوظيفة.');
+      }
       final application = ApplicationModel(
         id: id,
         jobId: job.id,
         seekerId: seeker.uid,
-        employerId: job.employerId,
+        employerId: employerId,
         status: ApplicationStatus.pending,
         appliedAt: DateTime.now().toUtc(),
       );

@@ -46,6 +46,21 @@ class JobSummaryCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium
                         ?.copyWith(color: AppColors.navySoft),
                   ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 15,
+                        color: AppColors.navySoft,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'نُشرت في ${_formatPostedAt(job.postedAt)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 14),
                   Wrap(
                     spacing: 8,
@@ -66,4 +81,10 @@ class JobSummaryCard extends StatelessWidget {
       ),
     ),
   );
+
+  String _formatPostedAt(DateTime postedAt) {
+    final day = postedAt.day.toString().padLeft(2, '0');
+    final month = postedAt.month.toString().padLeft(2, '0');
+    return '$day/$month/${postedAt.year}';
+  }
 }

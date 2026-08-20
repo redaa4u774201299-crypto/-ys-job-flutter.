@@ -56,7 +56,7 @@ final appRouterProvider = Provider<GoRouter>(
         routes: [
           GoRoute(path: '/', builder: (context, state) => const LandingPage()),
           GoRoute(
-            path: '/jobs',
+            path: AppRoutes.jobs,
             builder: (context, state) =>
                 JobsPage(query: state.uri.queryParameters['q']),
           ),
@@ -65,9 +65,14 @@ final appRouterProvider = Provider<GoRouter>(
             builder: (context, state) => const CompaniesPage(),
           ),
           GoRoute(
-            path: '/job/:id',
+            path: AppRoutes.jobDetailsPattern,
             builder: (context, state) =>
                 JobDetailsPage(jobId: state.pathParameters['id']!),
+          ),
+          GoRoute(
+            path: AppRoutes.legacyJobDetailsPattern,
+            redirect: (context, state) =>
+                AppRoutes.redirectLegacyJobDetails(state.pathParameters['id']!),
           ),
           GoRoute(
             path: '/profile',

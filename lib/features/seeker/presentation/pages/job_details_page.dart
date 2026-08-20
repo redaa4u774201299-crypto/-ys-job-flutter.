@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/firebase/firebase_runtime.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/auth/data/auth_service.dart';
-import '../../../../features/jobs/data/jobs_repository.dart';
+import '../../../../features/jobs/presentation/jobs_providers.dart';
 import '../../../../features/jobs/presentation/widgets/firebase_setup_state.dart';
 import '../../../../shared/models/job_model.dart';
 import '../../../../shared/models/user_model.dart';
@@ -19,16 +19,14 @@ class JobDetailsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (!ref.watch(firebaseRuntimeProvider).isReady)
       return const Center(child: FirebaseSetupState());
-    return StreamBuilder<JobModel?>(
-      stream: ref.read(jobsRepositoryProvider).watchJob(jobId),
-      builder: (context, snapshot) {
-        if (snapshot.hasError)
-          return const _DetailsNotice('تعذر تحميل تفاصيل الوظيفة.');
-        if (!snapshot.hasData)
-          return const Center(child: CircularProgressIndicator());
-        final job = snapshot.data;
-        if (job == null || !job.isActive)
+    final jobState = ref.watch(jobDetailsProvider(jobId));
+    return jobState.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const _DetailsNotice('تعذر تحميل تفاصيل الوظيفة.'),
+      data: (job) {
+        if (job == null || !job.isActive) {
           return const _DetailsNotice('هذه الوظيفة غير متاحة حاليًا.');
+        }
         return _JobDetails(job: job);
       },
     );
@@ -157,11 +155,27 @@ class _ApplyButton extends ConsumerWidget {
           stream: ref.read(authServiceProvider).watchProfile(user.uid),
           builder: (context, profileSnapshot) {
             final profile = profileSnapshot.data;
-            if (profile?.role == UserRole.employer)
+            if (profileSnapshot.hasError) {
               return const Text(
-                'حسابات أصحاب الشركات لا تتقدم للوظائف.',
+                'تعذر التحقق من صلاحية حسابك للتقديم.',
                 textAlign: TextAlign.center,
               );
+            }
+            if (profileSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (profile == null || !profile.isActive) {
+              return const Text(
+                'يتطلب التقديم حساب باحث عن عمل نشطًا.',
+                textAlign: TextAlign.center,
+              );
+            }
+            if (profile.role != UserRole.seeker) {
+              return const Text(
+                'التقديم متاح لحسابات الباحثين عن عمل فقط.',
+                textAlign: TextAlign.center,
+              );
+            }
             return StreamBuilder<bool>(
               stream: ref
                   .read(applicationsRepositoryProvider)
