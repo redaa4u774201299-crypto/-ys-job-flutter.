@@ -1,0 +1,63 @@
+name: Flutter Web CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-web-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-web:
+    name: Analyze, test, and build Flutter Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.1
+          channel: stable
+          cache: true
+
+      - name: Restore packages
+        run: flutter pub get
+
+      - name: Check formatting
+        run: dart format --set-exit-if-changed lib test
+
+      - name: Analyze source
+        run: flutter analyze
+
+      - name: Run unit and integration tests
+        run: flutter test
+
+      - name: Run browser tests in Chromium
+        shell: bash
+        run: |
+          export CHROME_EXECUTABLE="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_EXECUTABLE"
+          echo "Using browser executable: $CHROME_EXECUTABLE"
+          flutter test --platform chrome
+
+      - name: Build Flutter Web
+        run: flutter build web --no-tree-shake-icons
+
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ys-job-flutter-web
+          path: build/web
+          if-no-files-found: error
+          retention-days: 7
