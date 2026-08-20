@@ -4,8 +4,8 @@ import 'package:ys_job/shared/models/user_model.dart';
 
 void main() {
   group('destinationForRole', () {
-    test('يوجّه الباحث إلى قائمة الوظائف', () {
-      expect(destinationForRole(UserRole.seeker), '/jobs');
+    test('يوجّه الباحث إلى لوحته الشخصية', () {
+      expect(destinationForRole(UserRole.seeker), '/seeker-dashboard');
     });
 
     test('يوجّه صاحب الشركة إلى لوحة التحكم الخاصة به', () {

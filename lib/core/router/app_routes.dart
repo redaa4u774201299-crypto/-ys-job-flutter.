@@ -8,9 +8,17 @@ abstract final class AppRoutes {
   static const legacyJobDetailsPattern = '/job/:id';
   static const employerDashboard = '/employer-dashboard';
   static const addJob = '/add-job';
+  static const seekerDashboard = '/seeker-dashboard';
+  static const employerApplicationsPattern = '/employer/applications/:jobId';
+  static const legacyEmployerApplicationsPattern =
+      '/employer/jobs/:jobId/applications';
 
   /// يبني رابط تفاصيل الوظيفة من معرّف Firestore الحقيقي دون تكرار نص المسار.
   static String jobDetails(String jobId) => '/job-details/$jobId';
+
+  /// يبني رابط إدارة طلبات وظيفة يملكها الحساب الحالي.
+  static String employerApplications(String jobId) =>
+      '/employer/applications/$jobId';
 
   /// يحافظ على روابط التفاصيل القديمة دون إبقائها مسارًا رئيسيًا في الواجهة.
   static String redirectLegacyJobDetails(String jobId) => jobDetails(jobId);
@@ -21,4 +29,8 @@ abstract final class AppRoutes {
   /// يعيد توجيه رابط النشر القديم إلى المسار المستقل المعتمد.
   static String? redirectLegacyEmployerPostJob(String location) =>
       location == legacyEmployerPostJob ? addJob : null;
+
+  /// يحافظ على روابط طلبات الوظائف السابقة دون اعتمادها كمسار رئيسي.
+  static String redirectLegacyEmployerApplications(String jobId) =>
+      employerApplications(jobId);
 }

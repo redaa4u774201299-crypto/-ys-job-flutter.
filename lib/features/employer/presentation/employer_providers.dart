@@ -24,6 +24,13 @@ final employerApplicationsProvider = StreamProvider.autoDispose
           .watchEmployerApplications(employerId);
     });
 
+final employerJobApplicationsProvider = StreamProvider.autoDispose
+    .family<List<EmployerApplicationRecord>, String>((ref, jobId) {
+      return ref
+          .watch(applicationsRepositoryProvider)
+          .watchCurrentEmployerJobApplications(jobId);
+    });
+
 class EmployerJobsOverview {
   const EmployerJobsOverview({
     required this.totalJobs,

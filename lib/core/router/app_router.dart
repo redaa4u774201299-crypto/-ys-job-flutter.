@@ -16,6 +16,7 @@ import '../../features/employer/presentation/employer_layout.dart';
 import '../../features/home/presentation/pages/landing_page.dart';
 import '../../features/jobs/presentation/pages/jobs_page.dart';
 import '../../features/seeker/presentation/pages/job_details_page.dart';
+import '../../features/seeker/presentation/pages/seeker_dashboard_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../shared/layout/main_layout.dart';
 
@@ -45,9 +46,17 @@ final appRouterProvider = Provider<GoRouter>(
                 AppRoutes.redirectLegacyEmployerPostJob(state.uri.path),
           ),
           GoRoute(
-            path: '/employer/jobs/:id/applications',
-            builder: (context, state) =>
-                EmployerJobApplicationsPage(jobId: state.pathParameters['id']!),
+            path: AppRoutes.employerApplicationsPattern,
+            builder: (context, state) => EmployerJobApplicationsPage(
+              jobId: state.pathParameters['jobId']!,
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.legacyEmployerApplicationsPattern,
+            redirect: (context, state) =>
+                AppRoutes.redirectLegacyEmployerApplications(
+                  state.pathParameters['jobId']!,
+                ),
           ),
         ],
       ),
@@ -77,6 +86,10 @@ final appRouterProvider = Provider<GoRouter>(
           GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfilePage(),
+          ),
+          GoRoute(
+            path: AppRoutes.seekerDashboard,
+            builder: (context, state) => const SeekerDashboardPage(),
           ),
           GoRoute(
             path: '/admin-dashboard',

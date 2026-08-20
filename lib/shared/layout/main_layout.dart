@@ -16,6 +16,7 @@ class MainLayout extends ConsumerWidget {
   static const links = <_NavLink>[
     _NavLink('الرئيسية', '/', Icons.home_outlined),
     _NavLink('الوظائف', '/jobs', Icons.work_outline),
+    _NavLink('طلباتي', '/seeker-dashboard', Icons.assignment_outlined),
     _NavLink('الشركات', '/companies', Icons.business_outlined),
     _NavLink('حسابي', '/profile', Icons.person_outline),
   ];

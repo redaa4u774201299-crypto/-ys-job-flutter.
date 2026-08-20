@@ -38,9 +38,11 @@ class EmployerJobApplicationsPage extends ConsumerWidget {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (_, __) => const _ApplicationsNotice('تعذر قراءة ملف الشركة.'),
           data: (profile) {
-            if (profile == null || profile.role != UserRole.employer) {
+            if (profile == null ||
+                profile.role != UserRole.employer ||
+                !profile.isActive) {
               return const _ApplicationsNotice(
-                'هذه الصفحة متاحة لحسابات أصحاب الشركات فقط.',
+                'هذه الصفحة متاحة لحسابات أصحاب الشركات النشطة فقط.',
               );
             }
 
@@ -50,13 +52,9 @@ class EmployerJobApplicationsPage extends ConsumerWidget {
               error: (_, __) =>
                   const _ApplicationsNotice('تعذر التحقق من ملكية الوظيفة.'),
               data: (jobs) {
-                JobModel? job;
-                for (final candidate in jobs) {
-                  if (candidate.id == jobId) {
-                    job = candidate;
-                    break;
-                  }
-                }
+                final job = jobs
+                    .where((candidate) => candidate.id == jobId)
+                    .firstOrNull;
                 if (job == null) {
                   return const _ApplicationsNotice(
                     'لا تتوفر هذه الوظيفة ضمن حساب الشركة الحالي.',
@@ -64,23 +62,14 @@ class EmployerJobApplicationsPage extends ConsumerWidget {
                 }
 
                 final applicationsAsync = ref.watch(
-                  employerApplicationsProvider(profile.id),
+                  employerJobApplicationsProvider(jobId),
                 );
                 return applicationsAsync.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => const _ApplicationsNotice(
-                    'تعذر تحميل طلبات التقديم لهذه الوظيفة.',
-                  ),
-                  data: (applications) {
-                    final matchingApplications = applications
-                        .where((application) => application.jobId == jobId)
-                        .toList(growable: false);
-                    return _ApplicationsView(
-                      job: job!,
-                      applications: matchingApplications,
-                    );
-                  },
+                  error: (error, _) => _ApplicationsNotice('$error'),
+                  data: (applications) =>
+                      _ApplicationsView(job: job, applications: applications),
                 );
               },
             );
@@ -95,7 +84,7 @@ class _ApplicationsView extends ConsumerWidget {
   const _ApplicationsView({required this.job, required this.applications});
 
   final JobModel job;
-  final List<ApplicationModel> applications;
+  final List<EmployerApplicationRecord> applications;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -114,7 +103,7 @@ class _ApplicationsView extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'طلبات التقديم',
+                'إدارة طلبات التقديم',
                 style: Theme.of(context).textTheme.headlineSmall
                     ?.copyWith(fontWeight: FontWeight.w900),
               ),
@@ -127,92 +116,108 @@ class _ApplicationsView extends ConsumerWidget {
                 )
               else
                 ...applications.map(
-                  (application) => Padding(
+                  (record) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const CircleAvatar(
-                                  child: Icon(Icons.person_outline),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'متقدم للوظيفة',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                      ),
-                                      Text(
-                                        'تاريخ التقديم: ${_formatDate(application.appliedAt)}',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                _ApplicationStatusChip(
-                                  status: application.status,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            DropdownButtonFormField<ApplicationStatus>(
-                              initialValue: application.status,
-                              decoration: const InputDecoration(
-                                labelText: 'حالة الطلب',
-                                border: OutlineInputBorder(),
-                              ),
-                              items: ApplicationStatus.values
-                                  .map(
-                                    (status) => DropdownMenuItem(
-                                      value: status,
-                                      child: Text(status.arabicLabel),
-                                    ),
-                                  )
-                                  .toList(growable: false),
-                              onChanged: (status) async {
-                                if (status == null ||
-                                    status == application.status) {
-                                  return;
-                                }
-                                try {
-                                  await ref
-                                      .read(applicationsRepositoryProvider)
-                                      .updateApplicationStatus(
-                                        applicationId: application.id,
-                                        status: status,
-                                      );
-                                } catch (error) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('$error')),
-                                    );
-                                  }
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    child: _ApplicantCard(record: record),
                   ),
                 ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ApplicantCard extends ConsumerWidget {
+  const _ApplicantCard({required this.record});
+
+  final EmployerApplicationRecord record;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final application = record.application;
+    final seeker = record.seeker;
+    final seekerName = seeker?.name.trim().isNotEmpty == true
+        ? seeker!.name
+        : 'باحث عن عمل';
+    final seekerEmail = seeker?.email.trim().isNotEmpty == true
+        ? seeker!.email
+        : 'بيانات البريد غير متاحة';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const CircleAvatar(child: Icon(Icons.person_outline)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        seekerName,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(seekerEmail),
+                      const SizedBox(height: 4),
+                      Text(
+                        'تاريخ التقديم: ${_formatDate(application.appliedAt)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                _ApplicationStatusChip(status: application.status),
+              ],
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<ApplicationStatus>(
+              initialValue: application.status,
+              decoration: const InputDecoration(
+                labelText: 'تحديث حالة الطلب',
+                border: OutlineInputBorder(),
+              ),
+              items: ApplicationStatus.values
+                  .map(
+                    (status) => DropdownMenuItem(
+                      value: status,
+                      child: Text(status.arabicLabel),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (status) async {
+                if (status == null || status == application.status) return;
+                try {
+                  await ref
+                      .read(applicationsRepositoryProvider)
+                      .updateApplicationStatus(
+                        applicationId: application.id,
+                        status: status,
+                      );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('تم تحديث حالة الطلب بنجاح.'),
+                      ),
+                    );
+                  }
+                } catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(content: Text('$error')));
+                  }
+                }
+              },
+            ),
+          ],
         ),
       ),
     );

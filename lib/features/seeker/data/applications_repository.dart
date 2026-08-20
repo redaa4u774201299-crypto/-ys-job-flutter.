@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/firebase/firebase_runtime.dart';
 import '../../../shared/models/application_model.dart';
 import '../../../shared/models/job_model.dart';
+import '../../../shared/models/user_model.dart';
 import '../../notifications/data/notifications_repository.dart';
 
 final applicationsRepositoryProvider = Provider<ApplicationsRepository>((ref) {
@@ -101,6 +102,82 @@ class ApplicationsRepository {
                   ..sort((a, b) => b.appliedAt.compareTo(a.appliedAt)),
           );
 
+  Stream<List<EmployerApplicationRecord>> watchCurrentEmployerJobApplications(
+    String jobId,
+  ) async* {
+    final employer = _requireUser();
+    await _requireActiveRole(employer.uid, UserRole.employer);
+
+    final jobSnapshot = await _firestore.collection('jobs').doc(jobId).get();
+    if (!jobSnapshot.exists ||
+        jobSnapshot.data()?['employerId']?.toString() != employer.uid) {
+      throw StateError('لا تملك صلاحية عرض طلبات هذه الوظيفة.');
+    }
+
+    yield* _firestore
+        .collection('applications')
+        .where('jobId', isEqualTo: jobId)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          final applications =
+              snapshot.docs
+                  .map(ApplicationModel.fromFirestore)
+                  .where(
+                    (application) => application.employerId == employer.uid,
+                  )
+                  .toList(growable: false)
+                ..sort((a, b) => b.appliedAt.compareTo(a.appliedAt));
+          final records = await Future.wait(
+            applications.map((application) async {
+              final seekerSnapshot = await _firestore
+                  .collection('users')
+                  .doc(application.seekerId)
+                  .get();
+              return EmployerApplicationRecord(
+                application: application,
+                seeker: seekerSnapshot.exists
+                    ? UserModel.fromFirestore(seekerSnapshot)
+                    : null,
+              );
+            }),
+          );
+          return records;
+        });
+  }
+
+  Stream<List<SeekerApplicationRecord>>
+  watchCurrentSeekerApplications() async* {
+    final seeker = _requireUser();
+    await _requireActiveRole(seeker.uid, UserRole.seeker);
+
+    yield* _firestore
+        .collection('applications')
+        .where('seekerId', isEqualTo: seeker.uid)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          final applications =
+              snapshot.docs
+                  .map(ApplicationModel.fromFirestore)
+                  .toList(growable: false)
+                ..sort((a, b) => b.appliedAt.compareTo(a.appliedAt));
+          final records = await Future.wait(
+            applications.map((application) async {
+              final jobSnapshot = await _firestore
+                  .collection('jobs')
+                  .doc(application.jobId)
+                  .get();
+              return SeekerApplicationRecord(
+                application: application,
+                job: jobSnapshot.exists
+                    ? JobModel.fromFirestore(jobSnapshot)
+                    : null,
+              );
+            }),
+          );
+          return records;
+        });
+  }
+
   Future<void> updateApplicationStatus({
     required String applicationId,
     required ApplicationStatus status,
@@ -109,12 +186,23 @@ class ApplicationsRepository {
     if (employer == null) {
       throw StateError('سجل الدخول أولًا لإدارة طلبات المتقدمين.');
     }
+    await _requireActiveRole(employer.uid, UserRole.employer);
     final reference = _firestore.collection('applications').doc(applicationId);
     final snapshot = await reference.get();
     if (!snapshot.exists) throw StateError('لم يعد طلب التقديم متاحًا.');
     final application = ApplicationModel.fromFirestore(snapshot);
     if (application.employerId != employer.uid) {
       throw StateError('لا تملك صلاحية تحديث حالة هذا الطلب.');
+    }
+    final jobSnapshot = await _firestore
+        .collection('jobs')
+        .doc(application.jobId)
+        .get();
+    if (!jobSnapshot.exists ||
+        jobSnapshot.data()?['employerId']?.toString() != employer.uid) {
+      throw StateError(
+        'لا تملك صلاحية تحديث طلب لا يخص وظيفة منشورة من حسابك.',
+      );
     }
     if (application.status == status) return;
 
@@ -128,4 +216,36 @@ class ApplicationsRepository {
     );
     await batch.commit();
   }
+
+  User _requireUser() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('سجل الدخول أولًا للوصول إلى طلبات التقديم.');
+    }
+    return user;
+  }
+
+  Future<void> _requireActiveRole(String userId, UserRole role) async {
+    final profile = await _firestore.collection('users').doc(userId).get();
+    final data = profile.data();
+    if (!profile.exists ||
+        data?['role'] != role.name ||
+        data?['isActive'] == false) {
+      throw StateError('هذه العملية متاحة لحساب ${role.label} النشط فقط.');
+    }
+  }
+}
+
+class EmployerApplicationRecord {
+  const EmployerApplicationRecord({required this.application, this.seeker});
+
+  final ApplicationModel application;
+  final UserModel? seeker;
+}
+
+class SeekerApplicationRecord {
+  const SeekerApplicationRecord({required this.application, this.job});
+
+  final ApplicationModel application;
+  final JobModel? job;
 }

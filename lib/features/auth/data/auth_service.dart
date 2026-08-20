@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase/firebase_runtime.dart';
+import '../../../core/router/app_routes.dart';
 import '../../../shared/models/user_model.dart';
 
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
@@ -179,7 +180,7 @@ class AuthSession {
 String destinationForRole(UserRole role) => switch (role) {
   UserRole.admin => '/admin-dashboard',
   UserRole.employer => '/employer-dashboard',
-  UserRole.seeker => '/jobs',
+  UserRole.seeker => AppRoutes.seekerDashboard,
 };
 
 String authFailureMessage(Object error) {

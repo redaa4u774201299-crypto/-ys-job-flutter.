@@ -260,7 +260,7 @@ class _JobActions extends ConsumerWidget {
     runSpacing: 6,
     children: [
       OutlinedButton.icon(
-        onPressed: () => context.go('/employer/jobs/${job.id}/applications'),
+        onPressed: () => context.go(AppRoutes.employerApplications(job.id)),
         icon: const Icon(Icons.groups_outlined),
         label: const Text('طلبات التقديم'),
       ),
