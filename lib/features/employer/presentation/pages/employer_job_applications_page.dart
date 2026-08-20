@@ -1,0 +1,259 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/firebase/firebase_runtime.dart';
+import '../../../../features/auth/data/auth_service.dart';
+import '../../../../features/jobs/presentation/widgets/firebase_setup_state.dart';
+import '../../../../features/seeker/data/applications_repository.dart';
+import '../../../../shared/models/application_model.dart';
+import '../../../../shared/models/job_model.dart';
+import '../../../../shared/models/user_model.dart';
+import '../employer_providers.dart';
+
+class EmployerJobApplicationsPage extends ConsumerWidget {
+  const EmployerJobApplicationsPage({super.key, required this.jobId});
+
+  final String jobId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final runtime = ref.watch(firebaseRuntimeProvider);
+    if (!runtime.isReady) return const Center(child: FirebaseSetupState());
+
+    final auth = ref.watch(authStateProvider);
+    return auth.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) =>
+          const _ApplicationsNotice('تعذر التحقق من جلسة الحساب.'),
+      data: (user) {
+        if (user == null) {
+          return const _ApplicationsNotice(
+            'سجّل الدخول بحساب صاحب شركة لعرض المتقدمين.',
+          );
+        }
+
+        final profileAsync = ref.watch(userProfileProvider(user.uid));
+        return profileAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, __) => const _ApplicationsNotice('تعذر قراءة ملف الشركة.'),
+          data: (profile) {
+            if (profile == null || profile.role != UserRole.employer) {
+              return const _ApplicationsNotice(
+                'هذه الصفحة متاحة لحسابات أصحاب الشركات فقط.',
+              );
+            }
+
+            final jobsAsync = ref.watch(employerJobsProvider(profile.id));
+            return jobsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) =>
+                  const _ApplicationsNotice('تعذر التحقق من ملكية الوظيفة.'),
+              data: (jobs) {
+                JobModel? job;
+                for (final candidate in jobs) {
+                  if (candidate.id == jobId) {
+                    job = candidate;
+                    break;
+                  }
+                }
+                if (job == null) {
+                  return const _ApplicationsNotice(
+                    'لا تتوفر هذه الوظيفة ضمن حساب الشركة الحالي.',
+                  );
+                }
+
+                final applicationsAsync = ref.watch(
+                  employerApplicationsProvider(profile.id),
+                );
+                return applicationsAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (_, __) => const _ApplicationsNotice(
+                    'تعذر تحميل طلبات التقديم لهذه الوظيفة.',
+                  ),
+                  data: (applications) {
+                    final matchingApplications = applications
+                        .where((application) => application.jobId == jobId)
+                        .toList(growable: false);
+                    return _ApplicationsView(
+                      job: job!,
+                      applications: matchingApplications,
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ApplicationsView extends ConsumerWidget {
+  const _ApplicationsView({required this.job, required this.applications});
+
+  final JobModel job;
+  final List<ApplicationModel> applications;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 920),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextButton.icon(
+                onPressed: () => context.go('/employer-dashboard'),
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: const Text('العودة إلى لوحة الشركة'),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'طلبات التقديم',
+                style: Theme.of(context).textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 6),
+              Text('الوظيفة: ${job.title}'),
+              const SizedBox(height: 22),
+              if (applications.isEmpty)
+                const _ApplicationsNotice(
+                  'لم يصل أي طلب تقديم لهذه الوظيفة حتى الآن.',
+                )
+              else
+                ...applications.map(
+                  (application) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const CircleAvatar(
+                                  child: Icon(Icons.person_outline),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'متقدم للوظيفة',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      Text(
+                                        'تاريخ التقديم: ${_formatDate(application.appliedAt)}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                _ApplicationStatusChip(
+                                  status: application.status,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            DropdownButtonFormField<ApplicationStatus>(
+                              initialValue: application.status,
+                              decoration: const InputDecoration(
+                                labelText: 'حالة الطلب',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: ApplicationStatus.values
+                                  .map(
+                                    (status) => DropdownMenuItem(
+                                      value: status,
+                                      child: Text(status.arabicLabel),
+                                    ),
+                                  )
+                                  .toList(growable: false),
+                              onChanged: (status) async {
+                                if (status == null ||
+                                    status == application.status) {
+                                  return;
+                                }
+                                try {
+                                  await ref
+                                      .read(applicationsRepositoryProvider)
+                                      .updateApplicationStatus(
+                                        applicationId: application.id,
+                                        status: status,
+                                      );
+                                } catch (error) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('$error')),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ApplicationStatusChip extends StatelessWidget {
+  const _ApplicationStatusChip({required this.status});
+
+  final ApplicationStatus status;
+
+  @override
+  Widget build(BuildContext context) => Chip(
+    label: Text(status.arabicLabel),
+    backgroundColor: switch (status) {
+      ApplicationStatus.accepted => const Color(0xFFE8F5EC),
+      ApplicationStatus.rejected => const Color(0xFFFFECEB),
+      ApplicationStatus.interview => const Color(0xFFFFF3DB),
+      _ => const Color(0xFFEAF1F8),
+    },
+    side: BorderSide.none,
+  );
+}
+
+class _ApplicationsNotice extends StatelessWidget {
+  const _ApplicationsNotice(this.message);
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Text(message, textAlign: TextAlign.center),
+      ),
+    ),
+  );
+}
+
+String _formatDate(DateTime date) {
+  final local = date.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+}

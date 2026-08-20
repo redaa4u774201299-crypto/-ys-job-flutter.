@@ -9,7 +9,9 @@ import '../../features/admin/presentation/pages/admin_jobs_page.dart';
 import '../../features/admin/presentation/pages/admin_users_page.dart';
 import '../../features/companies/presentation/pages/companies_page.dart';
 import '../../features/employer/presentation/pages/employer_dashboard_page.dart';
+import '../../features/employer/presentation/pages/employer_job_applications_page.dart';
 import '../../features/employer/presentation/pages/post_job_page.dart';
+import '../../features/employer/presentation/employer_layout.dart';
 import '../../features/home/presentation/pages/landing_page.dart';
 import '../../features/jobs/presentation/pages/jobs_page.dart';
 import '../../features/seeker/presentation/pages/job_details_page.dart';
@@ -26,6 +28,24 @@ final appRouterProvider = Provider<GoRouter>(
         builder: (context, state) => const RegisterPage(),
       ),
       ShellRoute(
+        builder: (context, state, child) => EmployerLayout(child: child),
+        routes: [
+          GoRoute(
+            path: '/employer-dashboard',
+            builder: (context, state) => const EmployerDashboardPage(),
+          ),
+          GoRoute(
+            path: '/employer/post-job',
+            builder: (context, state) => const PostJobPage(),
+          ),
+          GoRoute(
+            path: '/employer/jobs/:id/applications',
+            builder: (context, state) =>
+                EmployerJobApplicationsPage(jobId: state.pathParameters['id']!),
+          ),
+        ],
+      ),
+      ShellRoute(
         builder: (context, state, child) => MainLayout(child: child),
         routes: [
           GoRoute(path: '/', builder: (context, state) => const LandingPage()),
@@ -37,14 +57,6 @@ final appRouterProvider = Provider<GoRouter>(
           GoRoute(
             path: '/companies',
             builder: (context, state) => const CompaniesPage(),
-          ),
-          GoRoute(
-            path: '/employer-dashboard',
-            builder: (context, state) => const EmployerDashboardPage(),
-          ),
-          GoRoute(
-            path: '/employer/post-job',
-            builder: (context, state) => const PostJobPage(),
           ),
           GoRoute(
             path: '/job/:id',
