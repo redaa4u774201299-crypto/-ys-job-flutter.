@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +10,7 @@ import '../../../../features/seeker/data/applications_repository.dart';
 import '../../../../shared/models/application_model.dart';
 import '../../../../shared/models/job_model.dart';
 import '../../../../shared/models/user_model.dart';
+import '../../../../shared/widgets/base64_thumbnail_avatar.dart';
 import '../employer_providers.dart';
 
 class EmployerJobApplicationsPage extends ConsumerWidget {
@@ -148,8 +147,6 @@ class _ApplicantCard extends ConsumerWidget {
         ? seeker!.email
         : 'بيانات البريد غير متاحة';
     final cvUrl = seeker?.cvUrl.trim() ?? '';
-    final imageProvider = _base64ImageProvider(seeker?.imageBase64 ?? '');
-
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -159,11 +156,9 @@ class _ApplicantCard extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  backgroundImage: imageProvider,
-                  child: imageProvider == null
-                      ? const Icon(Icons.person_outline)
-                      : null,
+                Base64ThumbnailAvatar(
+                  encoded: seeker?.imageThumbBase64 ?? '',
+                  fallbackLabel: seekerName,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -261,16 +256,6 @@ class _ApplicantCard extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تعذر فتح رابط السيرة الذاتية.')),
       );
-    }
-  }
-
-  ImageProvider<Object>? _base64ImageProvider(String encoded) {
-    if (encoded.trim().isEmpty) return null;
-    try {
-      final bytes = base64Decode(encoded);
-      return bytes.isEmpty ? null : MemoryImage(bytes);
-    } on FormatException {
-      return null;
     }
   }
 }

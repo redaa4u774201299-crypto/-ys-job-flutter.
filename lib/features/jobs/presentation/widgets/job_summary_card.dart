@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/job_model.dart';
+import '../../../../shared/widgets/base64_thumbnail_avatar.dart';
 
 class JobSummaryCard extends StatelessWidget {
   const JobSummaryCard({super.key, required this.job, this.onTap});
@@ -19,16 +20,10 @@ class JobSummaryCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 25,
-              backgroundColor: AppColors.beige,
-              foregroundColor: AppColors.navy,
-              child: Text(
-                job.employerName.isEmpty
-                    ? 'Y'
-                    : job.employerName.characters.first.toUpperCase(),
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
+            Base64ThumbnailAvatar(
+              encoded: job.employerLogoThumbBase64,
+              fallbackLabel: job.employerName,
+              fallbackIcon: Icons.business_outlined,
             ),
             const SizedBox(width: 14),
             Expanded(

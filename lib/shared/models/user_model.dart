@@ -31,7 +31,9 @@ class UserModel {
     this.skills = const [],
     this.phone = '',
     this.imageBase64 = '',
+    this.imageThumbBase64 = '',
     this.logoBase64 = '',
+    this.logoThumbBase64 = '',
     this.cvUrl = '',
     this.industry = '',
     this.companyName = '',
@@ -48,7 +50,9 @@ class UserModel {
   final List<String> skills;
   final String phone;
   final String imageBase64;
+  final String imageThumbBase64;
   final String logoBase64;
+  final String logoThumbBase64;
   final String cvUrl;
   final String industry;
   final String companyName;
@@ -65,7 +69,9 @@ class UserModel {
     List<String>? skills,
     String? phone,
     String? imageBase64,
+    String? imageThumbBase64,
     String? logoBase64,
+    String? logoThumbBase64,
     String? cvUrl,
     String? industry,
     String? companyName,
@@ -81,7 +87,9 @@ class UserModel {
     skills: skills ?? this.skills,
     phone: phone ?? this.phone,
     imageBase64: imageBase64 ?? this.imageBase64,
+    imageThumbBase64: imageThumbBase64 ?? this.imageThumbBase64,
     logoBase64: logoBase64 ?? this.logoBase64,
+    logoThumbBase64: logoThumbBase64 ?? this.logoThumbBase64,
     cvUrl: cvUrl ?? this.cvUrl,
     industry: industry ?? this.industry,
     companyName: companyName ?? this.companyName,
@@ -99,7 +107,9 @@ class UserModel {
     'skills': skills,
     'phone': phone,
     'imageBase64': imageBase64,
+    'imageThumbBase64': imageThumbBase64,
     'logoBase64': logoBase64,
+    'logoThumbBase64': logoThumbBase64,
     'cvUrl': cvUrl,
     'industry': industry,
     'companyName': companyName,
@@ -119,7 +129,9 @@ class UserModel {
     skills: _asTextList(json['skills']),
     phone: _asText(json['phone']),
     imageBase64: _asText(json['imageBase64']),
+    imageThumbBase64: _asText(json['imageThumbBase64']),
     logoBase64: _asText(json['logoBase64']),
+    logoThumbBase64: _asText(json['logoThumbBase64']),
     cvUrl: _asText(json['cvUrl']),
     industry: _asText(json['industry']),
     companyName: _asText(json['companyName']),
@@ -137,7 +149,9 @@ class UserModel {
     'skills': skills,
     'phone': phone,
     'imageBase64': imageBase64,
+    'imageThumbBase64': imageThumbBase64,
     'logoBase64': logoBase64,
+    'logoThumbBase64': logoThumbBase64,
     'cvUrl': cvUrl,
     'industry': industry,
     'companyName': companyName,

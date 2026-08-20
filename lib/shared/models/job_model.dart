@@ -34,6 +34,7 @@ class JobModel {
     this.requirements = '',
     this.status = JobStatus.active,
     this.employerName = '',
+    this.employerLogoThumbBase64 = '',
   });
 
   final String id;
@@ -48,6 +49,7 @@ class JobModel {
   final String requirements;
   final JobStatus status;
   final String employerName;
+  final String employerLogoThumbBase64;
 
   bool get isActive => status == JobStatus.active;
 
@@ -64,6 +66,7 @@ class JobModel {
     String? requirements,
     JobStatus? status,
     String? employerName,
+    String? employerLogoThumbBase64,
   }) => JobModel(
     id: id ?? this.id,
     employerId: employerId ?? this.employerId,
@@ -77,6 +80,8 @@ class JobModel {
     requirements: requirements ?? this.requirements,
     status: status ?? this.status,
     employerName: employerName ?? this.employerName,
+    employerLogoThumbBase64:
+        employerLogoThumbBase64 ?? this.employerLogoThumbBase64,
   );
 
   Map<String, dynamic> toJson() => {
@@ -92,6 +97,7 @@ class JobModel {
     'requirements': requirements,
     'status': status.value,
     'employerName': employerName,
+    'employerLogoThumbBase64': employerLogoThumbBase64,
   };
 
   factory JobModel.fromJson(Map<String, dynamic> json) => JobModel(
@@ -109,6 +115,7 @@ class JobModel {
     requirements: _asText(json['requirements']),
     status: JobStatus.fromValue(_asText(json['status'])),
     employerName: _asText(json['employerName']),
+    employerLogoThumbBase64: _asText(json['employerLogoThumbBase64']),
   );
 
   Map<String, dynamic> toFirestore() => {
@@ -124,6 +131,7 @@ class JobModel {
     'requirements': requirements,
     'status': status.value,
     'employerName': employerName,
+    'employerLogoThumbBase64': employerLogoThumbBase64,
   };
 
   factory JobModel.fromFirestore(
@@ -142,8 +150,9 @@ String _asText(dynamic value) {
 DateTime? _asDate(dynamic value) {
   if (value is Timestamp) return value.toDate().toUtc();
   if (value is DateTime) return value.toUtc();
-  if (value is int)
+  if (value is int) {
     return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  }
   if (value is String) return DateTime.tryParse(value)?.toUtc();
   return null;
 }

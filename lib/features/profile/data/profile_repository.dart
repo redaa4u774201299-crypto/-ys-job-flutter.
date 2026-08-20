@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
@@ -18,6 +17,16 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
 
 enum ProfileSyncOutcome { synced, pending }
 
+class ProfileImagePayload {
+  const ProfileImagePayload({
+    required this.fullBase64,
+    required this.thumbnailBase64,
+  });
+
+  final String fullBase64;
+  final String thumbnailBase64;
+}
+
 class ProfileRepository {
   ProfileRepository(
     this._firestore,
@@ -32,7 +41,10 @@ class ProfileRepository {
   // Base64 نص ASCII؛ لذلك يمثل طوله عدد البايتات التي ستضاف إلى مستند Firestore.
   static const int maxImageBase64Bytes = 512 * 1024;
   static const int maxImageDimension = 512;
+  static const int maxThumbnailBase64Bytes = 16 * 1024;
+  static const int maxThumbnailDimension = 96;
   static const List<int> _jpegQualitySteps = [72, 64, 56, 48, 40];
+  static const List<int> _thumbnailQualitySteps = [56, 48, 40, 32];
   static const List<int> _dimensionSteps = [512, 448, 384, 320, 256];
 
   final FirebaseFirestore _firestore;
@@ -91,22 +103,57 @@ class ProfileRepository {
   }
 
   Future<ProfileSyncOutcome> saveSeekerImage(PlatformFile file) {
-    return _savePayload({'imageBase64': encodeImageBase64(file)});
+    final image = encodeProfileImage(file);
+    return _savePayload({
+      'imageBase64': image.fullBase64,
+      'imageThumbBase64': image.thumbnailBase64,
+    });
   }
 
-  Future<ProfileSyncOutcome> saveCompanyLogo(PlatformFile file) {
-    return _savePayload({'logoBase64': encodeImageBase64(file)});
+  Future<ProfileSyncOutcome> saveCompanyLogo(PlatformFile file) async {
+    final user = _requireUser();
+    final logo = encodeProfileImage(file);
+    await _writePayload(user.uid, {
+      'logoBase64': logo.fullBase64,
+      'logoThumbBase64': logo.thumbnailBase64,
+    });
+    await _synchronizeEmployerLogoThumbnail(user.uid, logo.thumbnailBase64);
+    return _confirmPendingWrites();
   }
 
   Future<ProfileSyncOutcome> retryPendingSync() => _confirmPendingWrites();
 
   Future<ProfileSyncOutcome> _savePayload(Map<String, dynamic> payload) async {
     final user = _requireUser();
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .set(payload, SetOptions(merge: true));
+    await _writePayload(user.uid, payload);
     return _confirmPendingWrites();
+  }
+
+  Future<void> _writePayload(String userId, Map<String, dynamic> payload) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .set(payload, SetOptions(merge: true));
+  }
+
+  Future<void> _synchronizeEmployerLogoThumbnail(
+    String employerId,
+    String thumbnailBase64,
+  ) async {
+    final jobs = await _firestore
+        .collection('jobs')
+        .where('employerId', isEqualTo: employerId)
+        .get();
+    for (var start = 0; start < jobs.docs.length; start += 450) {
+      final end = (start + 450).clamp(0, jobs.docs.length);
+      final batch = _firestore.batch();
+      for (final job in jobs.docs.sublist(start, end)) {
+        batch.update(job.reference, {
+          'employerLogoThumbBase64': thumbnailBase64,
+        });
+      }
+      await batch.commit();
+    }
   }
 
   Future<ProfileSyncOutcome> _confirmPendingWrites() async {
@@ -187,6 +234,22 @@ class ProfileRepository {
         'يجب أن تكون ميزانية Base64 أكبر من صفر.',
       );
     }
+    return _encodeImageWithinBudget(
+      _decodeImage(file),
+      maxEncodedBytes: maxEncodedBytes,
+    );
+  }
+
+  static ProfileImagePayload encodeProfileImage(PlatformFile file) {
+    final image = _decodeImage(file);
+    return ProfileImagePayload(
+      fullBase64: _encodeImageWithinBudget(image),
+      thumbnailBase64: _encodeThumbnailBase64(image),
+    );
+  }
+
+  static img.Image _decodeImage(PlatformFile file) {
+    validateImageFile(file);
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
       throw const FormatException('تعذر قراءة الصورة المختارة.');
@@ -195,22 +258,39 @@ class ProfileRepository {
     if (decoded == null) {
       throw const FormatException('تعذر معالجة الصورة المختارة.');
     }
-    final oriented = img.bakeOrientation(decoded);
+    return img.bakeOrientation(decoded);
+  }
 
+  static String _encodeImageWithinBudget(
+    img.Image image, {
+    int maxEncodedBytes = maxImageBase64Bytes,
+  }) {
+    if (maxEncodedBytes <= 0) {
+      throw ArgumentError.value(
+        maxEncodedBytes,
+        'maxEncodedBytes',
+        'يجب أن تكون ميزانية Base64 أكبر من صفر.',
+      );
+    }
     for (final dimension in _dimensionSteps) {
-      final resized = _resizeImage(oriented, maxDimension: dimension);
+      final resized = _resizeImage(image, maxDimension: dimension);
       for (final quality in _jpegQualitySteps) {
-        final compressed = Uint8List.fromList(
-          img.encodeJpg(resized, quality: quality),
-        );
-        final encoded = base64Encode(compressed);
+        final encoded = base64Encode(img.encodeJpg(resized, quality: quality));
         if (encoded.length <= maxEncodedBytes) return encoded;
       }
     }
-
     throw const FormatException(
       'تعذر ضغط الصورة ضمن الحد الآمن. اختر صورة أبسط أو أصغر.',
     );
+  }
+
+  static String _encodeThumbnailBase64(img.Image image) {
+    final thumbnail = _resizeImage(image, maxDimension: maxThumbnailDimension);
+    for (final quality in _thumbnailQualitySteps) {
+      final encoded = base64Encode(img.encodeJpg(thumbnail, quality: quality));
+      if (encoded.length <= maxThumbnailBase64Bytes) return encoded;
+    }
+    throw const FormatException('تعذر إنشاء نسخة مصغرة آمنة للصورة.');
   }
 
   static img.Image _resizeImage(img.Image image, {required int maxDimension}) {

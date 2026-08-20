@@ -80,6 +80,8 @@ class JobsRepository {
     final user = _requireUser();
     final profile = await _firestore.collection('users').doc(user.uid).get();
     final employerName = (profile.data()?['name']?.toString().trim() ?? '');
+    final employerLogoThumbBase64 =
+        profile.data()?['logoThumbBase64']?.toString().trim() ?? '';
     if (employerName.isEmpty) {
       throw StateError('تعذر استعادة ملف الشركة أو صاحب الحساب.');
     }
@@ -88,6 +90,7 @@ class JobsRepository {
       id: document.id,
       employerId: user.uid,
       employerName: employerName,
+      employerLogoThumbBase64: employerLogoThumbBase64,
       title: title.trim(),
       description: description.trim(),
       requirements: requirements.trim(),

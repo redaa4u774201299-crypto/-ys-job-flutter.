@@ -6,7 +6,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:ys_job/features/profile/data/profile_repository.dart';
+import 'package:ys_job/shared/models/job_model.dart';
 import 'package:ys_job/shared/models/user_model.dart';
+import 'package:ys_job/shared/widgets/base64_thumbnail_avatar.dart';
 
 void main() {
   group('UserModel profile fields', () {
@@ -23,6 +25,7 @@ void main() {
           skills: const ['Flutter', 'Firebase'],
           phone: '777000111',
           imageBase64: 'aW1hZ2U=',
+          imageThumbBase64: 'dGh1bWI=',
           cvUrl: 'https://drive.google.com/file/d/cv',
           jobTitle: 'مطوّرة Flutter',
         );
@@ -31,6 +34,7 @@ void main() {
 
         expect(restored.phone, source.phone);
         expect(restored.imageBase64, source.imageBase64);
+        expect(restored.imageThumbBase64, source.imageThumbBase64);
         expect(restored.jobTitle, source.jobTitle);
         expect(restored.skills, source.skills);
         expect(restored.cvUrl, source.cvUrl);
@@ -50,6 +54,7 @@ void main() {
           industry: 'تقنية المعلومات',
           phone: '777000222',
           logoBase64: 'bG9nbw==',
+          logoThumbBase64: 'dGh1bWI=',
         );
         final restored = UserModel.fromJson(employer.toJson());
         final legacy = UserModel.fromJson({
@@ -62,9 +67,12 @@ void main() {
 
         expect(restored.companyName, 'شركة أفق للتقنية');
         expect(restored.industry, 'تقنية المعلومات');
+        expect(restored.logoThumbBase64, 'dGh1bWI=');
         expect(legacy.phone, isEmpty);
         expect(legacy.imageBase64, isEmpty);
+        expect(legacy.imageThumbBase64, isEmpty);
         expect(legacy.logoBase64, isEmpty);
+        expect(legacy.logoThumbBase64, isEmpty);
         expect(legacy.cvUrl, isEmpty);
         expect(legacy.companyName, isEmpty);
         expect(legacy.jobTitle, isEmpty);
@@ -237,6 +245,52 @@ void main() {
       );
     });
 
+    test('creates a compact thumbnail alongside the full profile image', () {
+      final random = Random(21);
+      final source = img.Image(width: 512, height: 512);
+      for (var y = 0; y < source.height; y++) {
+        for (var x = 0; x < source.width; x++) {
+          source.setPixelRgb(
+            x,
+            y,
+            random.nextInt(256),
+            random.nextInt(256),
+            random.nextInt(256),
+          );
+        }
+      }
+      final bytes = Uint8List.fromList(img.encodePng(source));
+      final file = PlatformFile(
+        name: 'profile-source.png',
+        size: bytes.lengthInBytes,
+        bytes: bytes,
+      );
+
+      final payload = ProfileRepository.encodeProfileImage(file);
+      final thumbnail = img.decodeImage(base64Decode(payload.thumbnailBase64));
+
+      expect(payload.fullBase64, isNotEmpty);
+      expect(payload.thumbnailBase64, isNotEmpty);
+      expect(
+        payload.thumbnailBase64.length,
+        lessThanOrEqualTo(ProfileRepository.maxThumbnailBase64Bytes),
+      );
+      expect(
+        payload.thumbnailBase64.length,
+        lessThan(payload.fullBase64.length),
+      );
+      expect(thumbnail, isNotNull);
+      if (thumbnail == null) fail('تعذر فك ترميز النسخة المصغرة.');
+      expect(
+        thumbnail.width,
+        lessThanOrEqualTo(ProfileRepository.maxThumbnailDimension),
+      );
+      expect(
+        thumbnail.height,
+        lessThanOrEqualTo(ProfileRepository.maxThumbnailDimension),
+      );
+    });
+
     test('accepts only external HTTP and HTTPS CV links', () {
       expect(
         ProfileRepository.normalizedExternalCvUrl(
@@ -289,5 +343,57 @@ void main() {
         expect(seeker.containsKey('industry'), isFalse);
       },
     );
+  });
+
+  group('Thumbnail performance contracts', () {
+    test('caps the decoded RGBA memory budget for a list avatar', () {
+      const radius = 25.0;
+      const devicePixelRatio = 2.0;
+
+      expect(
+        Base64ThumbnailAvatar.cacheDimension(
+          radius: radius,
+          devicePixelRatio: devicePixelRatio,
+        ),
+        100,
+      );
+      expect(
+        Base64ThumbnailAvatar.decodedRgbaByteBudget(
+          radius: radius,
+          devicePixelRatio: devicePixelRatio,
+        ),
+        40000,
+      );
+    });
+
+    test('decodes a thumbnail safely and rejects malformed Base64', () {
+      final decoded = Base64ThumbnailAvatar.decode(base64Encode([1, 2, 3]));
+
+      expect(decoded, isNotNull);
+      expect(decoded, orderedEquals([1, 2, 3]));
+      expect(Base64ThumbnailAvatar.decode('not-base64!'), isNull);
+      expect(Base64ThumbnailAvatar.decode('   '), isNull);
+    });
+
+    test('round-trips an employer thumbnail in a search job document', () {
+      final job = JobModel(
+        id: 'job-thumbnail',
+        employerId: 'employer-thumbnail',
+        title: 'مطور Flutter',
+        description: 'تطوير تطبيقات ويب',
+        location: 'صنعاء',
+        jobType: 'دوام كامل',
+        salaryRange: '',
+        isFeatured: false,
+        postedAt: DateTime.utc(2026, 8, 20),
+        employerName: 'شركة أفق',
+        employerLogoThumbBase64: 'dGh1bWI=',
+      );
+
+      final restored = JobModel.fromJson(job.toJson());
+
+      expect(restored.employerLogoThumbBase64, 'dGh1bWI=');
+      expect(job.toFirestore()['employerLogoThumbBase64'], 'dGh1bWI=');
+    });
   });
 }
