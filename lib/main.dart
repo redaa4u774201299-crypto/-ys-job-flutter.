@@ -28,6 +28,11 @@ Future<void> main() async {
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(options: _firebaseWebOptions);
     }
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: 20 * 1024 * 1024,
+      webPersistentTabManager: WebPersistentMultipleTabManager(),
+    );
     await AuthService(
       FirebaseAuth.instance,
       FirebaseFirestore.instance,

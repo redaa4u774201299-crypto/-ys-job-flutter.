@@ -8,28 +8,45 @@ final profileControllerProvider =
       (ref) => ProfileController(ref.watch(profileRepositoryProvider)),
     );
 
+enum ProfileSyncState { idle, saving, synced, pending, retrying, failed }
+
 class ProfileActionState {
   const ProfileActionState({
     this.isSaving = false,
     this.isProcessingImage = false,
+    this.syncState = ProfileSyncState.idle,
+    this.syncMessage = '',
   });
 
   final bool isSaving;
   final bool isProcessingImage;
+  final ProfileSyncState syncState;
+  final String syncMessage;
 
-  bool get isBusy => isSaving || isProcessingImage;
+  bool get isRetryingSync => syncState == ProfileSyncState.retrying;
+  bool get hasPendingSync => syncState == ProfileSyncState.pending;
+  bool get hasSyncFailure => syncState == ProfileSyncState.failed;
+  bool get needsSyncAttention => hasPendingSync || hasSyncFailure;
+  bool get isBusy => isSaving || isProcessingImage || isRetryingSync;
 
-  ProfileActionState copyWith({bool? isSaving, bool? isProcessingImage}) =>
-      ProfileActionState(
-        isSaving: isSaving ?? this.isSaving,
-        isProcessingImage: isProcessingImage ?? this.isProcessingImage,
-      );
+  ProfileActionState copyWith({
+    bool? isSaving,
+    bool? isProcessingImage,
+    ProfileSyncState? syncState,
+    String? syncMessage,
+  }) => ProfileActionState(
+    isSaving: isSaving ?? this.isSaving,
+    isProcessingImage: isProcessingImage ?? this.isProcessingImage,
+    syncState: syncState ?? this.syncState,
+    syncMessage: syncMessage ?? this.syncMessage,
+  );
 }
 
 class ProfileController extends StateNotifier<ProfileActionState> {
   ProfileController(this._repository) : super(const ProfileActionState());
 
   final ProfileRepository _repository;
+  Future<ProfileSyncOutcome> Function()? _retryOperation;
 
   Future<void> saveSeekerProfile({
     required String name,
@@ -70,21 +87,72 @@ class ProfileController extends StateNotifier<ProfileActionState> {
   Future<void> saveCompanyLogo(PlatformFile file) =>
       _runImageProcessing(() => _repository.saveCompanyLogo(file));
 
-  Future<void> _runSaving(Future<void> Function() operation) async {
-    state = state.copyWith(isSaving: true);
+  Future<void> retryPendingSync() async {
+    final retryOperation = _retryOperation;
+    state = state.copyWith(
+      syncState: ProfileSyncState.retrying,
+      syncMessage: '',
+    );
     try {
-      await operation();
-    } finally {
-      state = state.copyWith(isSaving: false);
+      final outcome = retryOperation == null
+          ? await _repository.retryPendingSync()
+          : await retryOperation();
+      _applySyncOutcome(outcome);
+    } catch (error) {
+      _recordSyncFailure(error);
+      rethrow;
     }
   }
 
-  Future<void> _runImageProcessing(Future<void> Function() operation) async {
-    state = state.copyWith(isProcessingImage: true);
+  Future<void> _runSaving(Future<ProfileSyncOutcome> Function() operation) =>
+      _runProfileWrite(operation);
+
+  Future<void> _runImageProcessing(
+    Future<ProfileSyncOutcome> Function() operation,
+  ) => _runProfileWrite(operation, isImage: true);
+
+  Future<void> _runProfileWrite(
+    Future<ProfileSyncOutcome> Function() operation, {
+    bool isImage = false,
+  }) async {
+    _retryOperation = operation;
+    state = state.copyWith(
+      isSaving: !isImage,
+      isProcessingImage: isImage,
+      syncState: ProfileSyncState.saving,
+      syncMessage: '',
+    );
     try {
-      await operation();
+      _applySyncOutcome(await operation());
+    } catch (error) {
+      _recordSyncFailure(error);
+      rethrow;
     } finally {
-      state = state.copyWith(isProcessingImage: false);
+      state = state.copyWith(isSaving: false, isProcessingImage: false);
     }
+  }
+
+  void _applySyncOutcome(ProfileSyncOutcome outcome) {
+    if (outcome == ProfileSyncOutcome.synced) {
+      _retryOperation = null;
+      state = state.copyWith(
+        syncState: ProfileSyncState.synced,
+        syncMessage: '',
+      );
+      return;
+    }
+    state = state.copyWith(
+      syncState: ProfileSyncState.pending,
+      syncMessage:
+          'حُفظت التغييرات محليًا وستتزامن تلقائيًا عند عودة الإنترنت.',
+    );
+  }
+
+  void _recordSyncFailure(Object error) {
+    state = state.copyWith(
+      syncState: ProfileSyncState.failed,
+      syncMessage:
+          'تعذر حفظ التغييرات الآن. تحقق من الاتصال ثم أعد المحاولة. (${error.toString().replaceFirst('Bad state: ', '')})',
+    );
   }
 }

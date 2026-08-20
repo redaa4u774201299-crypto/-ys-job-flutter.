@@ -87,7 +87,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           cvUrl: _cvUrlController.text,
         );
       }
-      if (mounted) _showSuccess('تم حفظ بيانات الملف الشخصي.');
+      if (mounted) {
+        final hasPendingSync = ref
+            .read(profileControllerProvider)
+            .hasPendingSync;
+        _showSuccess(
+          hasPendingSync
+              ? 'حُفظت التغييرات محليًا وستتزامن عند عودة الإنترنت.'
+              : 'تم حفظ بيانات الملف الشخصي.',
+        );
+      }
     } catch (error) {
       if (mounted) _showError(error);
     }
@@ -109,8 +118,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         await controller.saveSeekerImage(file);
       }
       if (mounted) {
+        final hasPendingSync = ref
+            .read(profileControllerProvider)
+            .hasPendingSync;
         _showSuccess(
-          profile.role == UserRole.employer
+          hasPendingSync
+              ? 'حُفظت الصورة محليًا وستتزامن عند عودة الإنترنت.'
+              : profile.role == UserRole.employer
               ? 'تم حفظ شعار الشركة بنجاح.'
               : 'تم حفظ الصورة الشخصية بنجاح.',
         );
@@ -135,6 +149,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   void _removeSkill(String skill) {
     setState(() => _skills = _skills.where((item) => item != skill).toList());
+  }
+
+  Future<void> _retryPendingSync() async {
+    try {
+      await ref.read(profileControllerProvider.notifier).retryPendingSync();
+      if (!mounted) return;
+      final stillPending = ref.read(profileControllerProvider).hasPendingSync;
+      _showSuccess(
+        stillPending
+            ? 'لا تزال التغييرات في انتظار الشبكة وستُرسل تلقائيًا عند عودتها.'
+            : 'اكتملت مزامنة تغييرات الملف الشخصي.',
+      );
+    } catch (error) {
+      if (mounted) _showError(error);
+    }
   }
 
   void _showSuccess(String message) {
@@ -200,6 +229,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   onRemoveSkill: _removeSkill,
                   onSave: () => _save(profile),
                   onSaveImage: () => _pickAndSaveImage(profile),
+                  onRetryPendingSync: _retryPendingSync,
                 );
               },
             );
@@ -227,6 +257,7 @@ class _ProfileForm extends StatelessWidget {
     required this.onRemoveSkill,
     required this.onSave,
     required this.onSaveImage,
+    required this.onRetryPendingSync,
   });
 
   final GlobalKey<FormState> formKey;
@@ -246,6 +277,7 @@ class _ProfileForm extends StatelessWidget {
   final ValueChanged<String> onRemoveSkill;
   final VoidCallback onSave;
   final VoidCallback onSaveImage;
+  final VoidCallback onRetryPendingSync;
 
   bool get _isEmployer => profile.role == UserRole.employer;
 
@@ -283,6 +315,13 @@ class _ProfileForm extends StatelessWidget {
                           ? 'حدّث المعلومات التي تظهر للباحثين عن عمل.'
                           : 'حدّث بياناتك المهنية وسيرتك الذاتية.',
                     ),
+                    if (actions.needsSyncAttention) ...[
+                      const SizedBox(height: 16),
+                      _ProfileSyncNotice(
+                        actions: actions,
+                        onRetry: onRetryPendingSync,
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     Center(
                       child: Column(
@@ -301,9 +340,7 @@ class _ProfileForm extends StatelessWidget {
                           ),
                           const SizedBox(height: 10),
                           OutlinedButton.icon(
-                            onPressed: actions.isProcessingImage
-                                ? null
-                                : onSaveImage,
+                            onPressed: actions.isBusy ? null : onSaveImage,
                             icon: actions.isProcessingImage
                                 ? const SizedBox(
                                     width: 18,
@@ -474,7 +511,7 @@ class _ProfileForm extends StatelessWidget {
                     ],
                     const SizedBox(height: 28),
                     FilledButton.icon(
-                      onPressed: actions.isSaving ? null : onSave,
+                      onPressed: actions.isBusy ? null : onSave,
                       icon: actions.isSaving
                           ? const SizedBox(
                               width: 18,
@@ -533,4 +570,55 @@ class _ProfileNotice extends StatelessWidget {
       child: Text(message, textAlign: TextAlign.center),
     ),
   );
+}
+
+class _ProfileSyncNotice extends StatelessWidget {
+  const _ProfileSyncNotice({required this.actions, required this.onRetry});
+
+  final ProfileActionState actions;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = actions.hasPendingSync;
+    final color = pending
+        ? Theme.of(context).colorScheme.secondaryContainer
+        : Theme.of(context).colorScheme.errorContainer;
+    final foreground = pending
+        ? Theme.of(context).colorScheme.onSecondaryContainer
+        : Theme.of(context).colorScheme.onErrorContainer;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              pending ? Icons.cloud_queue_outlined : Icons.cloud_off_outlined,
+              color: foreground,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                actions.syncMessage,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: foreground),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: actions.isRetryingSync ? null : onRetry,
+              child: Text(
+                actions.isRetryingSync ? 'جارٍ التحقق…' : 'إعادة المحاولة',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

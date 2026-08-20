@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -15,8 +16,16 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
   return ProfileRepository(FirebaseFirestore.instance, FirebaseAuth.instance);
 });
 
+enum ProfileSyncOutcome { synced, pending }
+
 class ProfileRepository {
-  ProfileRepository(this._firestore, this._auth);
+  ProfileRepository(
+    this._firestore,
+    this._auth, {
+    this.syncConfirmationTimeout = const Duration(seconds: 2),
+    Future<void> Function()? waitForPendingWrites,
+  }) : _waitForPendingWrites =
+           waitForPendingWrites ?? _firestore.waitForPendingWrites;
 
   static const int maxSourceImageBytes = 2 * 1024 * 1024;
   // يترك هذا السقف هامشًا كبيرًا للحقول النصية الأخرى داخل مستند المستخدم.
@@ -28,21 +37,22 @@ class ProfileRepository {
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+  final Duration syncConfirmationTimeout;
+  final Future<void> Function() _waitForPendingWrites;
 
-  Future<void> updateProfile({
+  Future<ProfileSyncOutcome> updateProfile({
     required String name,
     required String bio,
     required List<String> skills,
   }) async {
-    final user = _requireUser();
-    await _firestore.collection('users').doc(user.uid).update({
+    return _savePayload({
       'name': name.trim(),
       'bio': bio.trim(),
       'skills': normalizedSkills(skills),
     });
   }
 
-  Future<void> updateSeekerProfile({
+  Future<ProfileSyncOutcome> updateSeekerProfile({
     required String name,
     required String bio,
     required List<String> skills,
@@ -50,56 +60,68 @@ class ProfileRepository {
     required String jobTitle,
     required String cvUrl,
   }) async {
-    final user = _requireUser();
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .update(
-          seekerProfilePayload(
-            name: name,
-            bio: bio,
-            skills: skills,
-            phone: phone,
-            jobTitle: jobTitle,
-            cvUrl: cvUrl,
-          ),
-        );
+    return _savePayload(
+      seekerProfilePayload(
+        name: name,
+        bio: bio,
+        skills: skills,
+        phone: phone,
+        jobTitle: jobTitle,
+        cvUrl: cvUrl,
+      ),
+    );
   }
 
-  Future<void> updateEmployerProfile({
+  Future<ProfileSyncOutcome> updateEmployerProfile({
     required String name,
     required String companyName,
     required String industry,
     required String bio,
     required String phone,
   }) async {
+    return _savePayload(
+      employerProfilePayload(
+        name: name,
+        companyName: companyName,
+        industry: industry,
+        bio: bio,
+        phone: phone,
+      ),
+    );
+  }
+
+  Future<ProfileSyncOutcome> saveSeekerImage(PlatformFile file) {
+    return _savePayload({'imageBase64': encodeImageBase64(file)});
+  }
+
+  Future<ProfileSyncOutcome> saveCompanyLogo(PlatformFile file) {
+    return _savePayload({'logoBase64': encodeImageBase64(file)});
+  }
+
+  Future<ProfileSyncOutcome> retryPendingSync() => _confirmPendingWrites();
+
+  Future<ProfileSyncOutcome> _savePayload(Map<String, dynamic> payload) async {
     final user = _requireUser();
     await _firestore
         .collection('users')
         .doc(user.uid)
-        .update(
-          employerProfilePayload(
-            name: name,
-            companyName: companyName,
-            industry: industry,
-            bio: bio,
-            phone: phone,
-          ),
-        );
+        .set(payload, SetOptions(merge: true));
+    return _confirmPendingWrites();
   }
 
-  Future<void> saveSeekerImage(PlatformFile file) async {
-    final user = _requireUser();
-    await _firestore.collection('users').doc(user.uid).update({
-      'imageBase64': encodeImageBase64(file),
-    });
-  }
-
-  Future<void> saveCompanyLogo(PlatformFile file) async {
-    final user = _requireUser();
-    await _firestore.collection('users').doc(user.uid).update({
-      'logoBase64': encodeImageBase64(file),
-    });
+  Future<ProfileSyncOutcome> _confirmPendingWrites() async {
+    try {
+      await _waitForPendingWrites().timeout(syncConfirmationTimeout);
+      return ProfileSyncOutcome.synced;
+    } on TimeoutException {
+      // تظل الكتابة في طابور Firestore المحلي وستعاد تلقائيًا عند عودة الشبكة.
+      return ProfileSyncOutcome.pending;
+    } on FirebaseException catch (error) {
+      if (error.code == 'unavailable' || error.code == 'deadline-exceeded') {
+        return ProfileSyncOutcome.pending;
+      }
+      rethrow;
+    }
   }
 
   static List<String> normalizedSkills(Iterable<String> skills) {
