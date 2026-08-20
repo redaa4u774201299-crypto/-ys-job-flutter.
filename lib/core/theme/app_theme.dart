@@ -73,6 +73,38 @@ abstract final class AppTheme {
           ),
         ),
       ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.navy,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          side: const BorderSide(color: AppColors.navySoft),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.beige,
+        labelStyle: textTheme.labelMedium?.copyWith(
+          color: AppColors.navy,
+          fontWeight: FontWeight.w700,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        side: BorderSide.none,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.navy,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      tooltipTheme: TooltipThemeData(
+        waitDuration: const Duration(milliseconds: 500),
+        textStyle: textTheme.bodySmall?.copyWith(color: Colors.white),
+      ),
     );
   }
 }
