@@ -1,30 +1,30 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image/image.dart' as img;
 
 import '../../../core/firebase/firebase_runtime.dart';
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
   final runtime = ref.watch(firebaseRuntimeProvider);
   if (!runtime.isReady) throw StateError('Firebase غير مهيأ لهذا المشروع.');
-  return ProfileRepository(
-    FirebaseFirestore.instance,
-    FirebaseAuth.instance,
-    FirebaseStorage.instance,
-  );
+  return ProfileRepository(FirebaseFirestore.instance, FirebaseAuth.instance);
 });
 
 class ProfileRepository {
-  ProfileRepository(this._firestore, this._auth, this._storage);
+  ProfileRepository(this._firestore, this._auth);
 
-  static const int maxResumeBytes = 5 * 1024 * 1024;
-  static const int maxImageBytes = 2 * 1024 * 1024;
+  static const int maxSourceImageBytes = 2 * 1024 * 1024;
+  static const int maxStoredImageBytes = 450 * 1024;
+  static const int maxImageDimension = 512;
+  static const int jpegQuality = 72;
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
-  final FirebaseStorage _storage;
 
   Future<void> updateProfile({
     required String name,
@@ -45,6 +45,7 @@ class ProfileRepository {
     required List<String> skills,
     required String phone,
     required String jobTitle,
+    required String cvUrl,
   }) async {
     final user = _requireUser();
     await _firestore
@@ -57,6 +58,7 @@ class ProfileRepository {
             skills: skills,
             phone: phone,
             jobTitle: jobTitle,
+            cvUrl: cvUrl,
           ),
         );
   }
@@ -83,57 +85,18 @@ class ProfileRepository {
         );
   }
 
-  Future<String> uploadResume(PlatformFile file) async {
+  Future<void> saveSeekerImage(PlatformFile file) async {
     final user = _requireUser();
-    validateResumeFile(file);
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) {
-      throw const FormatException('تعذر قراءة ملف السيرة الذاتية.');
-    }
-    final reference = _storage.ref(
-      'resumes/${user.uid}/${DateTime.now().microsecondsSinceEpoch}.pdf',
-    );
-    await reference.putData(
-      bytes,
-      SettableMetadata(contentType: 'application/pdf'),
-    );
-    final url = await reference.getDownloadURL();
     await _firestore.collection('users').doc(user.uid).update({
-      'resumeUrl': url,
+      'imageBase64': encodeImageBase64(file),
     });
-    return url;
   }
 
-  Future<String> uploadPhoto(PlatformFile file) =>
-      _uploadImage(file, folder: 'photos');
-
-  Future<String> uploadCompanyLogo(PlatformFile file) =>
-      _uploadImage(file, folder: 'logos');
-
-  Future<String> _uploadImage(
-    PlatformFile file, {
-    required String folder,
-  }) async {
+  Future<void> saveCompanyLogo(PlatformFile file) async {
     final user = _requireUser();
-    validateImageFile(file);
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) {
-      throw const FormatException('تعذر قراءة الصورة المختارة.');
-    }
-
-    final extension = _imageExtension(file);
-    final reference = _storage.ref(
-      '$folder/${user.uid}/${DateTime.now().microsecondsSinceEpoch}.$extension',
-    );
-    await reference.putData(
-      bytes,
-      SettableMetadata(contentType: _imageContentType(extension)),
-    );
-    final url = await reference.getDownloadURL();
     await _firestore.collection('users').doc(user.uid).update({
-      'photoUrl': url,
+      'logoBase64': encodeImageBase64(file),
     });
-    return url;
   }
 
   static List<String> normalizedSkills(Iterable<String> skills) {
@@ -151,12 +114,14 @@ class ProfileRepository {
     required Iterable<String> skills,
     required String phone,
     required String jobTitle,
+    required String cvUrl,
   }) => {
     'name': name.trim(),
     'bio': bio.trim(),
     'skills': normalizedSkills(skills),
     'phone': phone.trim(),
     'jobTitle': jobTitle.trim(),
+    'cvUrl': normalizedExternalCvUrl(cvUrl),
   };
 
   static Map<String, dynamic> employerProfilePayload({
@@ -173,25 +138,58 @@ class ProfileRepository {
     'phone': phone.trim(),
   };
 
-  static void validateResumeFile(PlatformFile file) {
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      throw const FormatException('يسمح برفع ملفات PDF فقط.');
+  static void validateImageFile(PlatformFile file) {
+    final extension = _imageExtension(file);
+    if (extension != 'jpg' && extension != 'jpeg' && extension != 'png') {
+      throw const FormatException('يسمح باختيار صور JPG أو PNG فقط.');
     }
-    if (file.size > maxResumeBytes) {
+    if (file.size > maxSourceImageBytes) {
       throw const FormatException(
-        'الحد الأقصى لحجم السيرة الذاتية 5 ميغابايت.',
+        'الحد الأقصى لحجم الصورة قبل المعالجة 2 ميغابايت.',
       );
     }
   }
 
-  static void validateImageFile(PlatformFile file) {
-    final extension = _imageExtension(file);
-    if (extension != 'jpg' && extension != 'jpeg' && extension != 'png') {
-      throw const FormatException('يسمح برفع صور JPG أو PNG فقط.');
+  static String encodeImageBase64(PlatformFile file) {
+    validateImageFile(file);
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      throw const FormatException('تعذر قراءة الصورة المختارة.');
     }
-    if (file.size > maxImageBytes) {
-      throw const FormatException('الحد الأقصى لحجم الصورة 2 ميغابايت.');
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) {
+      throw const FormatException('تعذر معالجة الصورة المختارة.');
     }
+    final resized = _resizeImage(img.bakeOrientation(decoded));
+    final compressed = Uint8List.fromList(
+      img.encodeJpg(resized, quality: jpegQuality),
+    );
+    if (compressed.lengthInBytes > maxStoredImageBytes) {
+      throw const FormatException(
+        'تعذر ضغط الصورة إلى حجم مناسب. اختر صورة أبسط أو أصغر.',
+      );
+    }
+    return base64Encode(compressed);
+  }
+
+  static img.Image _resizeImage(img.Image image) {
+    final longestSide = image.width > image.height ? image.width : image.height;
+    if (longestSide <= maxImageDimension) return image;
+    return image.width >= image.height
+        ? img.copyResize(image, width: maxImageDimension)
+        : img.copyResize(image, height: maxImageDimension);
+  }
+
+  static String normalizedExternalCvUrl(String value) {
+    final url = value.trim();
+    if (url.isEmpty) return '';
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        uri.host.isEmpty ||
+        (uri.scheme != 'https' && uri.scheme != 'http')) {
+      throw const FormatException('أدخل رابطًا خارجيًا صالحًا للسيرة الذاتية.');
+    }
+    return uri.toString();
   }
 
   static String _imageExtension(PlatformFile file) {
@@ -200,11 +198,6 @@ class ProfileRepository {
     final parts = file.name.toLowerCase().split('.');
     return parts.length > 1 ? parts.last : '';
   }
-
-  static String _imageContentType(String extension) => switch (extension) {
-    'png' => 'image/png',
-    _ => 'image/jpeg',
-  };
 
   User _requireUser() {
     final user = _auth.currentUser;

@@ -68,9 +68,10 @@ service cloud.firestore {
             'email',
             'bio',
             'skills',
-            'resumeUrl',
             'phone',
-            'photoUrl',
+            'imageBase64',
+            'logoBase64',
+            'cvUrl',
             'industry',
             'companyName',
             'jobTitle'

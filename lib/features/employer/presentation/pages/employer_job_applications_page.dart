@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -145,8 +147,8 @@ class _ApplicantCard extends ConsumerWidget {
     final seekerEmail = seeker?.email.trim().isNotEmpty == true
         ? seeker!.email
         : 'بيانات البريد غير متاحة';
-    final resumeUrl = seeker?.resumeUrl.trim() ?? '';
-    final photoUrl = seeker?.photoUrl.trim() ?? '';
+    final cvUrl = seeker?.cvUrl.trim() ?? '';
+    final imageProvider = _base64ImageProvider(seeker?.imageBase64 ?? '');
 
     return Card(
       child: Padding(
@@ -158,10 +160,8 @@ class _ApplicantCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  backgroundImage: photoUrl.isEmpty
-                      ? null
-                      : NetworkImage(photoUrl),
-                  child: photoUrl.isEmpty
+                  backgroundImage: imageProvider,
+                  child: imageProvider == null
                       ? const Icon(Icons.person_outline)
                       : null,
                 ),
@@ -196,11 +196,11 @@ class _ApplicantCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
-            if (resumeUrl.isNotEmpty) ...[
+            if (cvUrl.isNotEmpty) ...[
               OutlinedButton.icon(
-                onPressed: () => _openResume(context, resumeUrl),
-                icon: const Icon(Icons.download_outlined),
-                label: const Text('تحميل السيرة الذاتية'),
+                onPressed: () => _openResume(context, cvUrl),
+                icon: const Icon(Icons.open_in_new_outlined),
+                label: const Text('فتح رابط السيرة الذاتية'),
               ),
               const SizedBox(height: 16),
             ],
@@ -248,8 +248,8 @@ class _ApplicantCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _openResume(BuildContext context, String resumeUrl) async {
-    final uri = Uri.tryParse(resumeUrl);
+  Future<void> _openResume(BuildContext context, String cvUrl) async {
+    final uri = Uri.tryParse(cvUrl);
     if (uri == null || !uri.hasScheme) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('رابط السيرة الذاتية غير صالح.')),
@@ -261,6 +261,16 @@ class _ApplicantCard extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تعذر فتح رابط السيرة الذاتية.')),
       );
+    }
+  }
+
+  ImageProvider<Object>? _base64ImageProvider(String encoded) {
+    if (encoded.trim().isEmpty) return null;
+    try {
+      final bytes = base64Decode(encoded);
+      return bytes.isEmpty ? null : MemoryImage(bytes);
+    } on FormatException {
+      return null;
     }
   }
 }

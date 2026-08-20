@@ -11,25 +11,19 @@ final profileControllerProvider =
 class ProfileActionState {
   const ProfileActionState({
     this.isSaving = false,
-    this.isUploadingPhoto = false,
-    this.isUploadingResume = false,
+    this.isProcessingImage = false,
   });
 
   final bool isSaving;
-  final bool isUploadingPhoto;
-  final bool isUploadingResume;
+  final bool isProcessingImage;
 
-  bool get isBusy => isSaving || isUploadingPhoto || isUploadingResume;
+  bool get isBusy => isSaving || isProcessingImage;
 
-  ProfileActionState copyWith({
-    bool? isSaving,
-    bool? isUploadingPhoto,
-    bool? isUploadingResume,
-  }) => ProfileActionState(
-    isSaving: isSaving ?? this.isSaving,
-    isUploadingPhoto: isUploadingPhoto ?? this.isUploadingPhoto,
-    isUploadingResume: isUploadingResume ?? this.isUploadingResume,
-  );
+  ProfileActionState copyWith({bool? isSaving, bool? isProcessingImage}) =>
+      ProfileActionState(
+        isSaving: isSaving ?? this.isSaving,
+        isProcessingImage: isProcessingImage ?? this.isProcessingImage,
+      );
 }
 
 class ProfileController extends StateNotifier<ProfileActionState> {
@@ -43,6 +37,7 @@ class ProfileController extends StateNotifier<ProfileActionState> {
     required List<String> skills,
     required String phone,
     required String jobTitle,
+    required String cvUrl,
   }) => _runSaving(
     () => _repository.updateSeekerProfile(
       name: name,
@@ -50,6 +45,7 @@ class ProfileController extends StateNotifier<ProfileActionState> {
       skills: skills,
       phone: phone,
       jobTitle: jobTitle,
+      cvUrl: cvUrl,
     ),
   );
 
@@ -68,14 +64,11 @@ class ProfileController extends StateNotifier<ProfileActionState> {
     ),
   );
 
-  Future<void> uploadSeekerPhoto(PlatformFile file) =>
-      _runPhoto(() => _repository.uploadPhoto(file));
+  Future<void> saveSeekerImage(PlatformFile file) =>
+      _runImageProcessing(() => _repository.saveSeekerImage(file));
 
-  Future<void> uploadCompanyLogo(PlatformFile file) =>
-      _runPhoto(() => _repository.uploadCompanyLogo(file));
-
-  Future<void> uploadResume(PlatformFile file) =>
-      _runResume(() => _repository.uploadResume(file));
+  Future<void> saveCompanyLogo(PlatformFile file) =>
+      _runImageProcessing(() => _repository.saveCompanyLogo(file));
 
   Future<void> _runSaving(Future<void> Function() operation) async {
     state = state.copyWith(isSaving: true);
@@ -86,21 +79,12 @@ class ProfileController extends StateNotifier<ProfileActionState> {
     }
   }
 
-  Future<void> _runPhoto(Future<void> Function() operation) async {
-    state = state.copyWith(isUploadingPhoto: true);
+  Future<void> _runImageProcessing(Future<void> Function() operation) async {
+    state = state.copyWith(isProcessingImage: true);
     try {
       await operation();
     } finally {
-      state = state.copyWith(isUploadingPhoto: false);
-    }
-  }
-
-  Future<void> _runResume(Future<void> Function() operation) async {
-    state = state.copyWith(isUploadingResume: true);
-    try {
-      await operation();
-    } finally {
-      state = state.copyWith(isUploadingResume: false);
+      state = state.copyWith(isProcessingImage: false);
     }
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,6 +23,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _bioController = TextEditingController();
   final _phoneController = TextEditingController();
   final _jobTitleController = TextEditingController();
+  final _cvUrlController = TextEditingController();
   final _skillController = TextEditingController();
   String? _loadedProfileId;
   String? _industry;
@@ -44,6 +47,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     _bioController.dispose();
     _phoneController.dispose();
     _jobTitleController.dispose();
+    _cvUrlController.dispose();
     _skillController.dispose();
     super.dispose();
   }
@@ -57,6 +61,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     _bioController.text = profile.bio;
     _phoneController.text = profile.phone;
     _jobTitleController.text = profile.jobTitle;
+    _cvUrlController.text = profile.cvUrl;
     _industry = profile.industry.isEmpty ? null : profile.industry;
     _skills = List<String>.from(profile.skills);
   }
@@ -79,6 +84,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           skills: _skills,
           phone: _phoneController.text,
           jobTitle: _jobTitleController.text,
+          cvUrl: _cvUrlController.text,
         );
       }
       if (mounted) _showSuccess('تم حفظ بيانات الملف الشخصي.');
@@ -87,7 +93,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
   }
 
-  Future<void> _pickAndUploadPhoto(UserModel profile) async {
+  Future<void> _pickAndSaveImage(UserModel profile) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['jpg', 'jpeg', 'png'],
@@ -98,33 +104,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     try {
       final controller = ref.read(profileControllerProvider.notifier);
       if (profile.role == UserRole.employer) {
-        await controller.uploadCompanyLogo(file);
+        await controller.saveCompanyLogo(file);
       } else {
-        await controller.uploadSeekerPhoto(file);
+        await controller.saveSeekerImage(file);
       }
       if (mounted) {
         _showSuccess(
           profile.role == UserRole.employer
-              ? 'تم رفع شعار الشركة بنجاح.'
-              : 'تم رفع الصورة الشخصية بنجاح.',
+              ? 'تم حفظ شعار الشركة بنجاح.'
+              : 'تم حفظ الصورة الشخصية بنجاح.',
         );
       }
-    } catch (error) {
-      if (mounted) _showError(error);
-    }
-  }
-
-  Future<void> _pickAndUploadResume() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['pdf'],
-      withData: true,
-    );
-    final file = result?.files.singleOrNull;
-    if (file == null) return;
-    try {
-      await ref.read(profileControllerProvider.notifier).uploadResume(file);
-      if (mounted) _showSuccess('تم رفع السيرة الذاتية بنجاح.');
     } catch (error) {
       if (mounted) _showError(error);
     }
@@ -198,6 +188,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   bioController: _bioController,
                   phoneController: _phoneController,
                   jobTitleController: _jobTitleController,
+                  cvUrlController: _cvUrlController,
                   skillController: _skillController,
                   skills: _skills,
                   industries: _industries,
@@ -208,8 +199,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   onAddSkill: _addSkill,
                   onRemoveSkill: _removeSkill,
                   onSave: () => _save(profile),
-                  onUploadPhoto: () => _pickAndUploadPhoto(profile),
-                  onUploadResume: _pickAndUploadResume,
+                  onSaveImage: () => _pickAndSaveImage(profile),
                 );
               },
             );
@@ -226,6 +216,7 @@ class _ProfileForm extends StatelessWidget {
     required this.bioController,
     required this.phoneController,
     required this.jobTitleController,
+    required this.cvUrlController,
     required this.skillController,
     required this.skills,
     required this.industries,
@@ -235,8 +226,7 @@ class _ProfileForm extends StatelessWidget {
     required this.onAddSkill,
     required this.onRemoveSkill,
     required this.onSave,
-    required this.onUploadPhoto,
-    required this.onUploadResume,
+    required this.onSaveImage,
   });
 
   final GlobalKey<FormState> formKey;
@@ -245,6 +235,7 @@ class _ProfileForm extends StatelessWidget {
   final TextEditingController bioController;
   final TextEditingController phoneController;
   final TextEditingController jobTitleController;
+  final TextEditingController cvUrlController;
   final TextEditingController skillController;
   final List<String> skills;
   final List<String> industries;
@@ -254,16 +245,15 @@ class _ProfileForm extends StatelessWidget {
   final VoidCallback onAddSkill;
   final ValueChanged<String> onRemoveSkill;
   final VoidCallback onSave;
-  final VoidCallback onUploadPhoto;
-  final VoidCallback onUploadResume;
+  final VoidCallback onSaveImage;
 
   bool get _isEmployer => profile.role == UserRole.employer;
 
   @override
   Widget build(BuildContext context) {
-    final image = profile.photoUrl.trim();
+    final image = _isEmployer ? profile.logoBase64 : profile.imageBase64;
     final photoLabel = _isEmployer ? 'شعار الشركة' : 'الصورة الشخصية';
-    final imageProvider = image.isNotEmpty ? NetworkImage(image) : null;
+    final imageProvider = _base64ImageProvider(image);
     final selectedIndustries = {
       ...industries,
       if (industry != null && !industries.contains(industry)) industry!,
@@ -311,10 +301,10 @@ class _ProfileForm extends StatelessWidget {
                           ),
                           const SizedBox(height: 10),
                           OutlinedButton.icon(
-                            onPressed: actions.isUploadingPhoto
+                            onPressed: actions.isProcessingImage
                                 ? null
-                                : onUploadPhoto,
-                            icon: actions.isUploadingPhoto
+                                : onSaveImage,
+                            icon: actions.isProcessingImage
                                 ? const SizedBox(
                                     width: 18,
                                     height: 18,
@@ -324,14 +314,14 @@ class _ProfileForm extends StatelessWidget {
                                   )
                                 : const Icon(Icons.upload_outlined),
                             label: Text(
-                              actions.isUploadingPhoto
-                                  ? 'جارٍ الرفع…'
-                                  : 'رفع $photoLabel',
+                              actions.isProcessingImage
+                                  ? 'جارٍ تجهيز الصورة…'
+                                  : 'اختيار $photoLabel',
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'JPG أو PNG بحد أقصى 2 ميغابايت',
+                            'JPG أو PNG حتى 2 ميغابايت. تُصغّر إلى 512px وتُحفظ داخل Firestore.',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -465,10 +455,21 @@ class _ProfileForm extends StatelessWidget {
                               .toList(growable: false),
                         ),
                       const SizedBox(height: 24),
-                      _ResumeSection(
-                        resumeUrl: profile.resumeUrl,
-                        uploading: actions.isUploadingResume,
-                        onUpload: onUploadResume,
+                      TextFormField(
+                        controller: cvUrlController,
+                        keyboardType: TextInputType.url,
+                        textDirection: TextDirection.ltr,
+                        decoration: const InputDecoration(
+                          labelText: 'رابط خارجي للسيرة الذاتية',
+                          hintText: 'https://drive.google.com/...',
+                          prefixIcon: Icon(Icons.link_outlined),
+                        ),
+                        validator: _externalCvUrlValidator,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'أضف رابط Google Drive أو أي رابط HTTPS/HTTP متاح لصاحب الوظيفة.',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
                     const SizedBox(height: 28),
@@ -497,61 +498,28 @@ class _ProfileForm extends StatelessWidget {
 
   static String? _requiredValidator(String? value) =>
       value == null || value.trim().isEmpty ? 'هذا الحقل مطلوب' : null;
-}
 
-class _ResumeSection extends StatelessWidget {
-  const _ResumeSection({
-    required this.resumeUrl,
-    required this.uploading,
-    required this.onUpload,
-  });
+  static String? _externalCvUrlValidator(String? value) {
+    final url = value?.trim() ?? '';
+    if (url.isEmpty) return null;
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        uri.host.isEmpty ||
+        (uri.scheme != 'https' && uri.scheme != 'http')) {
+      return 'أدخل رابطًا خارجيًا صالحًا يبدأ بـ https:// أو http://';
+    }
+    return null;
+  }
 
-  final String resumeUrl;
-  final bool uploading;
-  final VoidCallback onUpload;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'السيرة الذاتية',
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            resumeUrl.isEmpty
-                ? 'لم تُرفع سيرة ذاتية بعد.'
-                : 'تم رفع السيرة الذاتية. يمكنك استبدالها بملف PDF أحدث.',
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: uploading ? null : onUpload,
-            icon: uploading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.upload_file_outlined),
-            label: Text(
-              uploading ? 'جارٍ رفع الملف…' : 'رفع السيرة الذاتية (PDF)',
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'الحد الأقصى لحجم الملف 5 ميغابايت.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
-    ),
-  );
+  static ImageProvider<Object>? _base64ImageProvider(String encoded) {
+    if (encoded.trim().isEmpty) return null;
+    try {
+      final bytes = base64Decode(encoded);
+      return bytes.isEmpty ? null : MemoryImage(bytes);
+    } on FormatException {
+      return null;
+    }
+  }
 }
 
 class _ProfileNotice extends StatelessWidget {

@@ -29,9 +29,10 @@ class UserModel {
     required this.createdAt,
     this.bio = '',
     this.skills = const [],
-    this.resumeUrl = '',
     this.phone = '',
-    this.photoUrl = '',
+    this.imageBase64 = '',
+    this.logoBase64 = '',
+    this.cvUrl = '',
     this.industry = '',
     this.companyName = '',
     this.jobTitle = '',
@@ -45,9 +46,10 @@ class UserModel {
   final DateTime createdAt;
   final String bio;
   final List<String> skills;
-  final String resumeUrl;
   final String phone;
-  final String photoUrl;
+  final String imageBase64;
+  final String logoBase64;
+  final String cvUrl;
   final String industry;
   final String companyName;
   final String jobTitle;
@@ -61,9 +63,10 @@ class UserModel {
     DateTime? createdAt,
     String? bio,
     List<String>? skills,
-    String? resumeUrl,
     String? phone,
-    String? photoUrl,
+    String? imageBase64,
+    String? logoBase64,
+    String? cvUrl,
     String? industry,
     String? companyName,
     String? jobTitle,
@@ -76,9 +79,10 @@ class UserModel {
     createdAt: createdAt ?? this.createdAt,
     bio: bio ?? this.bio,
     skills: skills ?? this.skills,
-    resumeUrl: resumeUrl ?? this.resumeUrl,
     phone: phone ?? this.phone,
-    photoUrl: photoUrl ?? this.photoUrl,
+    imageBase64: imageBase64 ?? this.imageBase64,
+    logoBase64: logoBase64 ?? this.logoBase64,
+    cvUrl: cvUrl ?? this.cvUrl,
     industry: industry ?? this.industry,
     companyName: companyName ?? this.companyName,
     jobTitle: jobTitle ?? this.jobTitle,
@@ -93,9 +97,10 @@ class UserModel {
     'createdAt': createdAt.toUtc().toIso8601String(),
     'bio': bio,
     'skills': skills,
-    'resumeUrl': resumeUrl,
     'phone': phone,
-    'photoUrl': photoUrl,
+    'imageBase64': imageBase64,
+    'logoBase64': logoBase64,
+    'cvUrl': cvUrl,
     'industry': industry,
     'companyName': companyName,
     'jobTitle': jobTitle,
@@ -112,9 +117,10 @@ class UserModel {
         DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
     bio: _asText(json['bio']),
     skills: _asTextList(json['skills']),
-    resumeUrl: _asText(json['resumeUrl']),
     phone: _asText(json['phone']),
-    photoUrl: _asText(json['photoUrl']),
+    imageBase64: _asText(json['imageBase64']),
+    logoBase64: _asText(json['logoBase64']),
+    cvUrl: _asText(json['cvUrl']),
     industry: _asText(json['industry']),
     companyName: _asText(json['companyName']),
     jobTitle: _asText(json['jobTitle']),
@@ -129,9 +135,10 @@ class UserModel {
     'createdAt': Timestamp.fromDate(createdAt.toUtc()),
     'bio': bio,
     'skills': skills,
-    'resumeUrl': resumeUrl,
     'phone': phone,
-    'photoUrl': photoUrl,
+    'imageBase64': imageBase64,
+    'logoBase64': logoBase64,
+    'cvUrl': cvUrl,
     'industry': industry,
     'companyName': companyName,
     'jobTitle': jobTitle,
