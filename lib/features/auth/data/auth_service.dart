@@ -97,11 +97,22 @@ class AuthService {
       role: role,
       createdAt: DateTime.now().toUtc(),
     );
-    await _firestore
-        .collection('users')
-        .doc(profile.id)
-        .set(profile.toFirestore());
-    return AuthSession(firebaseUser: firebaseUser, profile: profile);
+    try {
+      await _firestore
+          .collection('users')
+          .doc(profile.id)
+          .set(profile.toFirestore());
+      return AuthSession(firebaseUser: firebaseUser, profile: profile);
+    } catch (_) {
+      // يمنع بقاء حساب Firebase جديد بلا ملف مستخدم في Firestore عند فشل الحفظ.
+      try {
+        await firebaseUser.delete();
+      } catch (_) {
+        // يبقى الخطأ الأصلي هو الأكثر فائدة للمستخدم؛ يمكن للإدارة معالجة
+        // أي حساب يتعذر حذفه من Firebase Console بصورة آمنة.
+      }
+      rethrow;
+    }
   }
 
   Future<AuthSession> signInWithGoogle() async {
@@ -162,12 +173,14 @@ class AuthSession {
   final User firebaseUser;
   final UserModel profile;
 
-  String get destination => switch (profile.role) {
-    UserRole.admin => '/admin-dashboard',
-    UserRole.employer => '/employer-dashboard',
-    UserRole.seeker => '/jobs',
-  };
+  String get destination => destinationForRole(profile.role);
 }
+
+String destinationForRole(UserRole role) => switch (role) {
+  UserRole.admin => '/admin-dashboard',
+  UserRole.employer => '/employer-dashboard',
+  UserRole.seeker => '/jobs',
+};
 
 String authFailureMessage(Object error) {
   if (error is FormatException) return error.message;

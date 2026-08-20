@@ -20,6 +20,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isBusy = false;
+  bool _obscurePassword = true;
   String? _errorMessage;
 
   @override
@@ -74,11 +75,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.lock_outline, color: AppColors.gold, size: 44),
+              const Icon(
+                Icons.lock_outline,
+                color: AppColors.gold,
+                size: 44,
+                semanticLabel: 'تسجيل الدخول الآمن',
+              ),
               const SizedBox(height: 18),
               Text(
                 'تسجيل الدخول',
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall
                     ?.copyWith(fontWeight: FontWeight.w900),
               ),
@@ -90,40 +98,65 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   'سجّل دخولك للوصول إلى مزايا YS.JOB. تُحفظ الجلسة على هذا المتصفح عبر Firebase Auth.',
                 ),
                 const SizedBox(height: 20),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _emailController,
-                        enabled: !_isBusy,
-                        keyboardType: TextInputType.emailAddress,
-                        autofillHints: const [AutofillHints.email],
-                        decoration: const InputDecoration(
-                          labelText: 'البريد الإلكتروني',
+                AutofillGroup(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _emailController,
+                          enabled: !_isBusy,
+                          keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.email],
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'البريد الإلكتروني',
+                            prefixIcon: Icon(Icons.alternate_email_outlined),
+                          ),
+                          validator: _emailValidator,
                         ),
-                        validator: _emailValidator,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _passwordController,
-                        enabled: !_isBusy,
-                        obscureText: true,
-                        autofillHints: const [AutofillHints.password],
-                        onFieldSubmitted: (_) => _submit(),
-                        decoration: const InputDecoration(
-                          labelText: 'كلمة المرور',
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _passwordController,
+                          enabled: !_isBusy,
+                          obscureText: _obscurePassword,
+                          autofillHints: const [AutofillHints.password],
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _submit(),
+                          decoration: InputDecoration(
+                            labelText: 'كلمة المرور',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              tooltip: _obscurePassword
+                                  ? 'إظهار كلمة المرور'
+                                  : 'إخفاء كلمة المرور',
+                              onPressed: _isBusy
+                                  ? null
+                                  : () => setState(
+                                      () =>
+                                          _obscurePassword = !_obscurePassword,
+                                    ),
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            ),
+                          ),
+                          validator: _passwordValidator,
                         ),
-                        validator: _passwordValidator,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 12),
                   Text(
                     _errorMessage!,
-                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 18),
@@ -131,7 +164,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: _isBusy ? null : _submit,
-                    child: Text(_isBusy ? 'جارٍ التحقق...' : 'تسجيل الدخول'),
+                    child: _isBusy
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('تسجيل الدخول'),
                   ),
                 ),
                 const SizedBox(height: 10),

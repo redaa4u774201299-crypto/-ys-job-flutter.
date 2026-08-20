@@ -20,6 +20,11 @@ final appRouterProvider = Provider<GoRouter>(
   (ref) => GoRouter(
     initialLocation: '/',
     routes: [
+      GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterPage(),
+      ),
       ShellRoute(
         builder: (context, state, child) => MainLayout(child: child),
         routes: [
@@ -32,14 +37,6 @@ final appRouterProvider = Provider<GoRouter>(
           GoRoute(
             path: '/companies',
             builder: (context, state) => const CompaniesPage(),
-          ),
-          GoRoute(
-            path: '/login',
-            builder: (context, state) => const LoginPage(),
-          ),
-          GoRoute(
-            path: '/register',
-            builder: (context, state) => const RegisterPage(),
           ),
           GoRoute(
             path: '/employer-dashboard',

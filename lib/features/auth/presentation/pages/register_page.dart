@@ -24,6 +24,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _confirmPasswordController = TextEditingController();
   UserRole _role = UserRole.seeker;
   bool _isBusy = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   String? _errorMessage;
 
   @override
@@ -117,8 +119,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         controller: _nameController,
                         enabled: !_isBusy,
                         autofillHints: const [AutofillHints.name],
+                        textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
                           labelText: 'الاسم الكامل',
+                          prefixIcon: Icon(Icons.person_outline),
                         ),
                         validator: (value) => value?.trim().isEmpty ?? true
                             ? 'الاسم مطلوب.'
@@ -130,8 +134,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         enabled: !_isBusy,
                         keyboardType: TextInputType.emailAddress,
                         autofillHints: const [AutofillHints.email],
+                        textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
                           labelText: 'البريد الإلكتروني',
+                          prefixIcon: Icon(Icons.alternate_email_outlined),
                         ),
                         validator: _emailValidator,
                       ),
@@ -139,10 +145,28 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       TextFormField(
                         controller: _passwordController,
                         enabled: !_isBusy,
-                        obscureText: true,
+                        obscureText: _obscurePassword,
                         autofillHints: const [AutofillHints.newPassword],
-                        decoration: const InputDecoration(
+                        textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(
                           labelText: 'كلمة المرور',
+                          helperText: '8 أحرف على الأقل',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            tooltip: _obscurePassword
+                                ? 'إظهار كلمة المرور'
+                                : 'إخفاء كلمة المرور',
+                            onPressed: _isBusy
+                                ? null
+                                : () => setState(
+                                    () => _obscurePassword = !_obscurePassword,
+                                  ),
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
                         ),
                         validator: _passwordValidator,
                       ),
@@ -150,11 +174,29 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       TextFormField(
                         controller: _confirmPasswordController,
                         enabled: !_isBusy,
-                        obscureText: true,
+                        obscureText: _obscureConfirmPassword,
                         autofillHints: const [AutofillHints.newPassword],
+                        textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _register(),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'تأكيد كلمة المرور',
+                          prefixIcon: const Icon(Icons.verified_user_outlined),
+                          suffixIcon: IconButton(
+                            tooltip: _obscureConfirmPassword
+                                ? 'إظهار كلمة المرور'
+                                : 'إخفاء كلمة المرور',
+                            onPressed: _isBusy
+                                ? null
+                                : () => setState(
+                                    () => _obscureConfirmPassword =
+                                        !_obscureConfirmPassword,
+                                  ),
+                            icon: Icon(
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
                         ),
                         validator: (value) => value != _passwordController.text
                             ? 'كلمتا المرور غير متطابقتين.'
@@ -168,15 +210,21 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   Text(
                     _errorMessage!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 18),
                 ElevatedButton(
                   onPressed: _isBusy ? null : _register,
-                  child: Text(
-                    _isBusy ? 'جارٍ إنشاء الحساب...' : 'إنشاء الحساب',
-                  ),
+                  child: _isBusy
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('إنشاء الحساب'),
                 ),
                 const SizedBox(height: 8),
                 TextButton(
