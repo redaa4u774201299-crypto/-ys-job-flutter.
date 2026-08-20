@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../features/auth/data/auth_service.dart';
 import '../../../../features/jobs/presentation/widgets/firebase_setup_state.dart';
 import '../../../../shared/models/user_model.dart';
+import '../admin_access_policy.dart';
 
 class AdminAccessGate extends ConsumerWidget {
   const AdminAccessGate({super.key, required this.builder});
@@ -29,12 +30,12 @@ class AdminAccessGate extends ConsumerWidget {
         final profile = ref.watch(userProfileProvider(firebaseUser.uid));
         return profile.when(
           data: (user) {
-            if (user == null || user.role != UserRole.admin || !user.isActive) {
+            if (!hasAdminAccess(user)) {
               return const _AccessDenied(
                 message: 'لا تملك صلاحية الوصول إلى لوحة الإدارة.',
               );
             }
-            return builder(context, user);
+            return builder(context, user!);
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (_, _) => const _AccessDenied(

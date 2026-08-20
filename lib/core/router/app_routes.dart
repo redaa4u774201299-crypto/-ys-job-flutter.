@@ -3,12 +3,17 @@
 /// يجمع هذا العقد نقاط التنقل الخاصة بصاحب العمل لمنع استمرار أي شاشة في
 /// استخدام مسار نشر الوظيفة القديم بعد اعتماد المسار المستقل.
 abstract final class AppRoutes {
+  static const home = '/';
   static const jobs = '/jobs';
   static const jobDetailsPattern = '/job-details/:id';
   static const legacyJobDetailsPattern = '/job/:id';
   static const employerDashboard = '/employer-dashboard';
   static const addJob = '/add-job';
   static const seekerDashboard = '/seeker-dashboard';
+  static const adminDashboard = '/admin-dashboard';
+  static const adminUsers = '/admin/users';
+  static const adminJobs = '/admin/jobs';
+  static const adminFeatureRequests = '/admin/feature-requests';
   static const employerApplicationsPattern = '/employer/applications/:jobId';
   static const legacyEmployerApplicationsPattern =
       '/employer/jobs/:jobId/applications';

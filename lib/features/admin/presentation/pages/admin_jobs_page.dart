@@ -156,8 +156,39 @@ class _JobActions extends StatelessWidget {
         ),
         child: Text(job.isFeatured ? 'إلغاء التمييز' : 'تمييز'),
       ),
+      OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(foregroundColor: Colors.red.shade800),
+        onPressed: () => _confirmDelete(context),
+        icon: const Icon(Icons.delete_outline),
+        label: const Text('حذف'),
+      ),
     ],
   );
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف الوظيفة؟'),
+        content: Text(
+          'سيُحذف إعلان "${job.title}" نهائيًا. تبقى سجلات طلبات التقديم محفوظة لأغراض المتابعة.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('حذف الوظيفة'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true || !context.mounted) return;
+    await _run(context, () => repository.deleteJob(job.id), 'تم حذف الوظيفة.');
+  }
+
   Future<void> _run(
     BuildContext context,
     Future<void> Function() action,

@@ -8,6 +8,7 @@ import '../../features/admin/presentation/pages/admin_dashboard_page.dart';
 import '../../features/admin/presentation/pages/admin_feature_requests_page.dart';
 import '../../features/admin/presentation/pages/admin_jobs_page.dart';
 import '../../features/admin/presentation/pages/admin_users_page.dart';
+import '../../features/admin/presentation/admin_layout.dart';
 import '../../features/companies/presentation/pages/companies_page.dart';
 import '../../features/employer/presentation/pages/employer_dashboard_page.dart';
 import '../../features/employer/presentation/pages/employer_job_applications_page.dart';
@@ -61,6 +62,27 @@ final appRouterProvider = Provider<GoRouter>(
         ],
       ),
       ShellRoute(
+        builder: (context, state, child) => AdminLayout(child: child),
+        routes: [
+          GoRoute(
+            path: AppRoutes.adminDashboard,
+            builder: (context, state) => const AdminDashboardPage(),
+          ),
+          GoRoute(
+            path: AppRoutes.adminUsers,
+            builder: (context, state) => const AdminUsersPage(),
+          ),
+          GoRoute(
+            path: AppRoutes.adminJobs,
+            builder: (context, state) => const AdminJobsPage(),
+          ),
+          GoRoute(
+            path: AppRoutes.adminFeatureRequests,
+            builder: (context, state) => const AdminFeatureRequestsPage(),
+          ),
+        ],
+      ),
+      ShellRoute(
         builder: (context, state, child) => MainLayout(child: child),
         routes: [
           GoRoute(path: '/', builder: (context, state) => const LandingPage()),
@@ -90,22 +112,6 @@ final appRouterProvider = Provider<GoRouter>(
           GoRoute(
             path: AppRoutes.seekerDashboard,
             builder: (context, state) => const SeekerDashboardPage(),
-          ),
-          GoRoute(
-            path: '/admin-dashboard',
-            builder: (context, state) => const AdminDashboardPage(),
-          ),
-          GoRoute(
-            path: '/admin/users',
-            builder: (context, state) => const AdminUsersPage(),
-          ),
-          GoRoute(
-            path: '/admin/jobs',
-            builder: (context, state) => const AdminJobsPage(),
-          ),
-          GoRoute(
-            path: '/admin/feature-requests',
-            builder: (context, state) => const AdminFeatureRequestsPage(),
           ),
         ],
       ),

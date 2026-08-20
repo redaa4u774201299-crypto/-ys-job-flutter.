@@ -160,9 +160,20 @@ class _AccountAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canChange = user.id != currentAdminId;
-    return OutlinedButton(
-      onPressed: canChange ? () => _setActive(context, !user.isActive) : null,
-      child: Text(user.isActive ? 'حظر الحساب' : 'إلغاء الحظر'),
+    return Tooltip(
+      message: canChange
+          ? (user.isActive ? 'إيقاف الحساب' : 'تفعيل الحساب')
+          : 'لا يمكن للمدير إيقاف حسابه بنفسه',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(user.isActive ? 'نشط' : 'موقوف'),
+          Switch.adaptive(
+            value: user.isActive,
+            onChanged: canChange ? (value) => _setActive(context, value) : null,
+          ),
+        ],
+      ),
     );
   }
 

@@ -41,8 +41,9 @@ class AdminRepository {
 
   Stream<int> watchUsersCount() => watchUsers().map((users) => users.length);
 
-  Stream<int> watchJobsCount() => _firestore
+  Stream<int> watchActiveJobsCount() => _firestore
       .collection('jobs')
+      .where('status', isEqualTo: JobStatus.active.value)
       .snapshots()
       .map((snapshot) => snapshot.size);
 
@@ -94,6 +95,15 @@ class AdminRepository {
       'status': JobStatus.hidden.value,
       'isFeatured': false,
     });
+  }
+
+  Future<void> deleteJob(String jobId) async {
+    await _requireAdmin();
+    final reference = _firestore.collection('jobs').doc(jobId);
+    final snapshot = await reference.get();
+    if (!snapshot.exists)
+      throw StateError('الوظيفة غير متاحة أو حُذفت مسبقًا.');
+    await reference.delete();
   }
 
   Future<void> setJobFeatured({
