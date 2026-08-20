@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +9,9 @@ import '../../../../core/firebase/firebase_runtime.dart';
 import '../../../../features/auth/data/auth_service.dart';
 import '../../../../features/jobs/presentation/widgets/firebase_setup_state.dart';
 import '../../../../shared/models/user_model.dart';
+import '../../data/profile_repository.dart';
 import '../profile_controller.dart';
+import '../widgets/image_crop_dialog.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -111,11 +114,26 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final file = result?.files.singleOrNull;
     if (file == null) return;
     try {
+      ProfileRepository.validateImageFile(file);
+      final sourceBytes = file.bytes;
+      if (sourceBytes == null || sourceBytes.isEmpty) {
+        throw const FormatException('تعذر قراءة الصورة المختارة.');
+      }
+      if (!mounted) return;
+      final photoLabel = profile.role == UserRole.employer
+          ? 'شعار الشركة'
+          : 'الصورة الشخصية';
+      final croppedBytes = await showDialog<Uint8List>(
+        context: context,
+        builder: (_) =>
+            ImageCropDialog(imageBytes: sourceBytes, imageLabel: photoLabel),
+      );
+      if (croppedBytes == null || !mounted) return;
       final controller = ref.read(profileControllerProvider.notifier);
       if (profile.role == UserRole.employer) {
-        await controller.saveCompanyLogo(file);
+        await controller.saveCompanyLogoBytes(croppedBytes);
       } else {
-        await controller.saveSeekerImage(file);
+        await controller.saveSeekerImageBytes(croppedBytes);
       }
       if (mounted) {
         final hasPendingSync = ref

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
@@ -104,6 +105,16 @@ class ProfileRepository {
 
   Future<ProfileSyncOutcome> saveSeekerImage(PlatformFile file) {
     final image = encodeProfileImage(file);
+    return _saveSeekerImagePayload(image);
+  }
+
+  Future<ProfileSyncOutcome> saveSeekerImageBytes(Uint8List bytes) {
+    return _saveSeekerImagePayload(encodeProfileImageFromBytes(bytes));
+  }
+
+  Future<ProfileSyncOutcome> _saveSeekerImagePayload(
+    ProfileImagePayload image,
+  ) {
     return _savePayload({
       'imageBase64': image.fullBase64,
       'imageThumbBase64': image.thumbnailBase64,
@@ -111,8 +122,17 @@ class ProfileRepository {
   }
 
   Future<ProfileSyncOutcome> saveCompanyLogo(PlatformFile file) async {
+    return _saveCompanyLogoPayload(encodeProfileImage(file));
+  }
+
+  Future<ProfileSyncOutcome> saveCompanyLogoBytes(Uint8List bytes) {
+    return _saveCompanyLogoPayload(encodeProfileImageFromBytes(bytes));
+  }
+
+  Future<ProfileSyncOutcome> _saveCompanyLogoPayload(
+    ProfileImagePayload logo,
+  ) async {
     final user = _requireUser();
-    final logo = encodeProfileImage(file);
     await _writePayload(user.uid, {
       'logoBase64': logo.fullBase64,
       'logoThumbBase64': logo.thumbnailBase64,
@@ -227,6 +247,16 @@ class ProfileRepository {
     int maxEncodedBytes = maxImageBase64Bytes,
   }) {
     validateImageFile(file);
+    return encodeImageBase64FromBytes(
+      file.bytes ?? Uint8List(0),
+      maxEncodedBytes: maxEncodedBytes,
+    );
+  }
+
+  static String encodeImageBase64FromBytes(
+    Uint8List bytes, {
+    int maxEncodedBytes = maxImageBase64Bytes,
+  }) {
     if (maxEncodedBytes <= 0) {
       throw ArgumentError.value(
         maxEncodedBytes,
@@ -235,23 +265,26 @@ class ProfileRepository {
       );
     }
     return _encodeImageWithinBudget(
-      _decodeImage(file),
+      _decodeImageBytes(bytes),
       maxEncodedBytes: maxEncodedBytes,
     );
   }
 
   static ProfileImagePayload encodeProfileImage(PlatformFile file) {
-    final image = _decodeImage(file);
+    validateImageFile(file);
+    return encodeProfileImageFromBytes(file.bytes ?? Uint8List(0));
+  }
+
+  static ProfileImagePayload encodeProfileImageFromBytes(Uint8List bytes) {
+    final image = _decodeImageBytes(bytes);
     return ProfileImagePayload(
       fullBase64: _encodeImageWithinBudget(image),
       thumbnailBase64: _encodeThumbnailBase64(image),
     );
   }
 
-  static img.Image _decodeImage(PlatformFile file) {
-    validateImageFile(file);
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) {
+  static img.Image _decodeImageBytes(Uint8List bytes) {
+    if (bytes.isEmpty) {
       throw const FormatException('تعذر قراءة الصورة المختارة.');
     }
     final decoded = img.decodeImage(bytes);

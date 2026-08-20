@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -84,8 +86,14 @@ class ProfileController extends StateNotifier<ProfileActionState> {
   Future<void> saveSeekerImage(PlatformFile file) =>
       _runImageProcessing(() => _repository.saveSeekerImage(file));
 
+  Future<void> saveSeekerImageBytes(Uint8List bytes) =>
+      _runImageProcessing(() => _repository.saveSeekerImageBytes(bytes));
+
   Future<void> saveCompanyLogo(PlatformFile file) =>
       _runImageProcessing(() => _repository.saveCompanyLogo(file));
+
+  Future<void> saveCompanyLogoBytes(Uint8List bytes) =>
+      _runImageProcessing(() => _repository.saveCompanyLogoBytes(bytes));
 
   Future<void> retryPendingSync() async {
     final retryOperation = _retryOperation;

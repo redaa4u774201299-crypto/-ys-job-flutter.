@@ -1,15 +1,19 @@
 import 'dart:async';
 
+import 'dart:typed_data';
+
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 
 import 'package:ys_job/core/firebase/firebase_runtime.dart';
 import 'package:ys_job/features/auth/data/auth_service.dart';
 import 'package:ys_job/features/profile/data/profile_repository.dart';
 import 'package:ys_job/features/profile/presentation/pages/profile_page.dart';
+import 'package:ys_job/features/profile/presentation/widgets/image_crop_dialog.dart';
 import 'package:ys_job/shared/models/user_model.dart';
 
 void main() {
@@ -153,4 +157,51 @@ void main() {
       expect(find.textContaining('حُفظت التغييرات محليًا'), findsWidgets);
     },
   );
+
+  testWidgets('إلغاء القص يعيد نتيجة فارغة ولا يعدّل ملف Firestore', (
+    tester,
+  ) async {
+    final firestore = await seededFirestore();
+    final before = await firestore.collection('users').doc(profileId).get();
+    final source = img.Image(width: 120, height: 120);
+    img.fill(source, color: img.ColorRgb8(217, 164, 65));
+    final sourceBytes = Uint8List.fromList(img.encodePng(source));
+    Uint8List? cropResult;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: Center(
+              child: Builder(
+                builder: (context) => FilledButton(
+                  onPressed: () async {
+                    cropResult = await showDialog<Uint8List>(
+                      context: context,
+                      builder: (_) => ImageCropDialog(
+                        imageBytes: sourceBytes,
+                        imageLabel: 'الصورة الشخصية',
+                      ),
+                    );
+                  },
+                  child: const Text('فتح القص'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('فتح القص'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('قص الصورة الشخصية'), findsOneWidget);
+
+    await tester.tap(find.text('إلغاء'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final after = await firestore.collection('users').doc(profileId).get();
+    expect(cropResult, isNull);
+    expect(after.data(), equals(before.data()));
+  });
 }

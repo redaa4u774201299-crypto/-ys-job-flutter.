@@ -144,6 +144,33 @@ void main() {
       );
     });
 
+    test('compresses cropped bytes before Base64 encoding', () {
+      final croppedSource = img.Image(width: 720, height: 720);
+      img.fill(croppedSource, color: img.ColorRgb8(6, 26, 51));
+      final croppedBytes = Uint8List.fromList(img.encodePng(croppedSource));
+
+      final encoded = ProfileRepository.encodeImageBase64FromBytes(
+        croppedBytes,
+      );
+      final restored = img.decodeImage(base64Decode(encoded));
+
+      expect(encoded, isNotEmpty);
+      expect(restored, isNotNull);
+      if (restored == null) fail('تعذر فك ترميز الصورة المقصوصة المضغوطة.');
+      expect(
+        restored.width,
+        lessThanOrEqualTo(ProfileRepository.maxImageDimension),
+      );
+      expect(
+        restored.height,
+        lessThanOrEqualTo(ProfileRepository.maxImageDimension),
+      );
+      expect(
+        utf8.encode(encoded).length,
+        lessThanOrEqualTo(ProfileRepository.maxImageBase64Bytes),
+      );
+    });
+
     test('keeps a high-detail image within the Base64 budget', () {
       final random = Random(42);
       final source = img.Image(width: 512, height: 512);
@@ -281,6 +308,42 @@ void main() {
       );
       expect(thumbnail, isNotNull);
       if (thumbnail == null) fail('تعذر فك ترميز النسخة المصغرة.');
+      expect(
+        thumbnail.width,
+        lessThanOrEqualTo(ProfileRepository.maxThumbnailDimension),
+      );
+      expect(
+        thumbnail.height,
+        lessThanOrEqualTo(ProfileRepository.maxThumbnailDimension),
+      );
+    });
+
+    test('creates full and thumbnail payloads from cropped bytes', () {
+      final croppedSource = img.Image(width: 600, height: 600);
+      img.fill(croppedSource, color: img.ColorRgb8(217, 164, 65));
+      final croppedBytes = Uint8List.fromList(img.encodePng(croppedSource));
+
+      final payload = ProfileRepository.encodeProfileImageFromBytes(
+        croppedBytes,
+      );
+      final fullImage = img.decodeImage(base64Decode(payload.fullBase64));
+      final thumbnail = img.decodeImage(base64Decode(payload.thumbnailBase64));
+
+      expect(payload.fullBase64, isNotEmpty);
+      expect(payload.thumbnailBase64, isNotEmpty);
+      expect(fullImage, isNotNull);
+      expect(thumbnail, isNotNull);
+      if (fullImage == null || thumbnail == null) {
+        fail('تعذر إنشاء مخرجات الصورة المقصوصة.');
+      }
+      expect(
+        fullImage.width,
+        lessThanOrEqualTo(ProfileRepository.maxImageDimension),
+      );
+      expect(
+        fullImage.height,
+        lessThanOrEqualTo(ProfileRepository.maxImageDimension),
+      );
       expect(
         thumbnail.width,
         lessThanOrEqualTo(ProfileRepository.maxThumbnailDimension),
