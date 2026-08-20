@@ -19,9 +19,12 @@ class ProfileRepository {
   ProfileRepository(this._firestore, this._auth);
 
   static const int maxSourceImageBytes = 2 * 1024 * 1024;
-  static const int maxStoredImageBytes = 450 * 1024;
+  // يترك هذا السقف هامشًا كبيرًا للحقول النصية الأخرى داخل مستند المستخدم.
+  // Base64 نص ASCII؛ لذلك يمثل طوله عدد البايتات التي ستضاف إلى مستند Firestore.
+  static const int maxImageBase64Bytes = 512 * 1024;
   static const int maxImageDimension = 512;
-  static const int jpegQuality = 72;
+  static const List<int> _jpegQualitySteps = [72, 64, 56, 48, 40];
+  static const List<int> _dimensionSteps = [512, 448, 384, 320, 256];
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
@@ -150,8 +153,18 @@ class ProfileRepository {
     }
   }
 
-  static String encodeImageBase64(PlatformFile file) {
+  static String encodeImageBase64(
+    PlatformFile file, {
+    int maxEncodedBytes = maxImageBase64Bytes,
+  }) {
     validateImageFile(file);
+    if (maxEncodedBytes <= 0) {
+      throw ArgumentError.value(
+        maxEncodedBytes,
+        'maxEncodedBytes',
+        'يجب أن تكون ميزانية Base64 أكبر من صفر.',
+      );
+    }
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
       throw const FormatException('تعذر قراءة الصورة المختارة.');
@@ -160,24 +173,30 @@ class ProfileRepository {
     if (decoded == null) {
       throw const FormatException('تعذر معالجة الصورة المختارة.');
     }
-    final resized = _resizeImage(img.bakeOrientation(decoded));
-    final compressed = Uint8List.fromList(
-      img.encodeJpg(resized, quality: jpegQuality),
-    );
-    if (compressed.lengthInBytes > maxStoredImageBytes) {
-      throw const FormatException(
-        'تعذر ضغط الصورة إلى حجم مناسب. اختر صورة أبسط أو أصغر.',
-      );
+    final oriented = img.bakeOrientation(decoded);
+
+    for (final dimension in _dimensionSteps) {
+      final resized = _resizeImage(oriented, maxDimension: dimension);
+      for (final quality in _jpegQualitySteps) {
+        final compressed = Uint8List.fromList(
+          img.encodeJpg(resized, quality: quality),
+        );
+        final encoded = base64Encode(compressed);
+        if (encoded.length <= maxEncodedBytes) return encoded;
+      }
     }
-    return base64Encode(compressed);
+
+    throw const FormatException(
+      'تعذر ضغط الصورة ضمن الحد الآمن. اختر صورة أبسط أو أصغر.',
+    );
   }
 
-  static img.Image _resizeImage(img.Image image) {
+  static img.Image _resizeImage(img.Image image, {required int maxDimension}) {
     final longestSide = image.width > image.height ? image.width : image.height;
-    if (longestSide <= maxImageDimension) return image;
+    if (longestSide <= maxDimension) return image;
     return image.width >= image.height
-        ? img.copyResize(image, width: maxImageDimension)
-        : img.copyResize(image, height: maxImageDimension);
+        ? img.copyResize(image, width: maxDimension)
+        : img.copyResize(image, height: maxDimension);
   }
 
   static String normalizedExternalCvUrl(String value) {

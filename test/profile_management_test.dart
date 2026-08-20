@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -127,6 +129,111 @@ void main() {
       expect(
         restored.height,
         lessThanOrEqualTo(ProfileRepository.maxImageDimension),
+      );
+      expect(
+        utf8.encode(encoded).length,
+        lessThanOrEqualTo(ProfileRepository.maxImageBase64Bytes),
+      );
+    });
+
+    test('keeps a high-detail image within the Base64 budget', () {
+      final random = Random(42);
+      final source = img.Image(width: 512, height: 512);
+      for (var y = 0; y < source.height; y++) {
+        for (var x = 0; x < source.width; x++) {
+          source.setPixelRgb(
+            x,
+            y,
+            random.nextInt(256),
+            random.nextInt(256),
+            random.nextInt(256),
+          );
+        }
+      }
+      final bytes = Uint8List.fromList(img.encodeJpg(source, quality: 95));
+      final file = PlatformFile(
+        name: 'detailed.jpg',
+        size: bytes.lengthInBytes,
+        bytes: bytes,
+      );
+
+      final encoded = ProfileRepository.encodeImageBase64(file);
+      final restored = img.decodeImage(base64Decode(encoded));
+
+      expect(
+        encoded.length,
+        lessThanOrEqualTo(ProfileRepository.maxImageBase64Bytes),
+      );
+      expect(restored, isNotNull);
+      if (restored == null) fail('تعذر فك ترميز الصورة المضغوطة.');
+      expect(
+        restored.width,
+        lessThanOrEqualTo(ProfileRepository.maxImageDimension),
+      );
+      expect(
+        restored.height,
+        lessThanOrEqualTo(ProfileRepository.maxImageDimension),
+      );
+    });
+
+    test(
+      'progressively reduces image dimensions for a narrow Base64 budget',
+      () {
+        final random = Random(7);
+        final source = img.Image(width: 512, height: 512);
+        for (var y = 0; y < source.height; y++) {
+          for (var x = 0; x < source.width; x++) {
+            source.setPixelRgb(
+              x,
+              y,
+              random.nextInt(256),
+              random.nextInt(256),
+              random.nextInt(256),
+            );
+          }
+        }
+        final bytes = Uint8List.fromList(img.encodePng(source));
+        final file = PlatformFile(
+          name: 'resize-required.png',
+          size: bytes.lengthInBytes,
+          bytes: bytes,
+        );
+        const narrowBudget = 100 * 1024;
+
+        final encoded = ProfileRepository.encodeImageBase64(
+          file,
+          maxEncodedBytes: narrowBudget,
+        );
+        final restored = img.decodeImage(base64Decode(encoded));
+
+        expect(encoded.length, lessThanOrEqualTo(narrowBudget));
+        expect(restored, isNotNull);
+        if (restored == null) fail('تعذر فك ترميز الصورة بعد التصغير المتدرج.');
+        expect(
+          restored.width < ProfileRepository.maxImageDimension ||
+              restored.height < ProfileRepository.maxImageDimension,
+          isTrue,
+        );
+      },
+    );
+
+    test('rejects an image when an explicit Base64 budget cannot fit it', () {
+      final source = img.Image(width: 64, height: 64);
+      img.fill(source, color: img.ColorRgb8(6, 26, 51));
+      final bytes = Uint8List.fromList(img.encodePng(source));
+      final file = PlatformFile(
+        name: 'too-small-budget.png',
+        size: bytes.lengthInBytes,
+        bytes: bytes,
+      );
+
+      expect(
+        () => ProfileRepository.encodeImageBase64(file, maxEncodedBytes: 1),
+        throwsFormatException,
+      );
+      expect(
+        () => ProfileRepository.encodeImageBase64(file, maxEncodedBytes: 0),
+        throwsArgumentError,
       );
     });
 
