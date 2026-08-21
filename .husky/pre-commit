@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+
+if [ "${HUSKY_SKIP_FIRESTORE_RULES:-}" = "1" ]; then
+  echo "[husky] تم تجاوز اختبار قواعد Firestore بواسطة HUSKY_SKIP_FIRESTORE_RULES=1. تظل بوابة CI إلزامية."
+  exit 0
+fi
+
+echo "[husky] تشغيل اختبارات قواعد Firestore عبر Firebase Emulator..."
+npm run test:firestore-rules
