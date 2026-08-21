@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/firebase/firebase_runtime.dart';
 import '../../../core/monitoring/app_performance_monitor.dart';
 import '../../../shared/models/job_model.dart';
+import '../../../shared/search/job_search_index.dart';
 
 final jobsRepositoryProvider = Provider<JobsRepository>((ref) {
   final runtime = ref.watch(firebaseRuntimeProvider);
@@ -49,19 +50,34 @@ class JobsRepository {
   final FirebaseAuth _auth;
   final AppPerformanceMonitor _performanceMonitor;
 
-  Stream<List<JobModel>> watchAvailableJobs(JobFilters filters) {
-    final stream = _firestore
+  Stream<List<JobModel>> watchAvailableJobs(JobFilters filters) =>
+      searchJobs(filters);
+
+  /// يستعلم Firestore باستخدام مفاتيح عامة قابلة للفهرسة، بدل تحميل الوظائف
+  /// ثم البحث داخل الوصف محليًا. تُبقي واجهة المستخدم البحث الفارغ خارج هذا
+  /// المسار، بينما يظل الاستعراض العام متاحًا عندما تكون الفلاتر فارغة.
+  Stream<List<JobModel>> searchJobs(JobFilters filters) {
+    final normalizedQuery = JobSearchIndex.normalize(filters.query);
+    final normalizedLocation = JobSearchIndex.normalize(filters.location);
+    Query<Map<String, dynamic>> query = _firestore
         .collection('jobs')
-        .where('status', isEqualTo: JobStatus.active.value)
-        .snapshots()
-        .map(
-          (snapshot) =>
-              snapshot.docs
-                  .map(JobModel.fromFirestore)
-                  .where((job) => _matches(job, filters))
-                  .toList(growable: false)
-                ..sort((a, b) => b.postedAt.compareTo(a.postedAt)),
-        );
+        .where('status', isEqualTo: JobStatus.active.value);
+
+    if (normalizedLocation.isNotEmpty) {
+      query = query.where('locationKey', isEqualTo: normalizedLocation);
+    }
+    if (normalizedQuery.isNotEmpty) {
+      query = query.where('searchTerms', arrayContains: normalizedQuery);
+    }
+
+    final stream = query.snapshots().map(
+      (snapshot) =>
+          snapshot.docs
+              .map(JobModel.fromFirestore)
+              .where((job) => _matches(job, filters))
+              .toList(growable: false)
+            ..sort((a, b) => b.postedAt.compareTo(a.postedAt)),
+    );
     return _performanceMonitor.measureFirstStream(
       'jobs_initial_load',
       stream,
@@ -146,14 +162,7 @@ class JobsRepository {
   }
 
   bool _matches(JobModel job, JobFilters filters) {
-    final query = filters.query.trim().toLowerCase();
-    final location = filters.location.trim().toLowerCase();
     final type = filters.jobType.trim().toLowerCase();
-    final searchable =
-        '${job.title} ${job.description} ${job.employerName} ${job.location}'
-            .toLowerCase();
-    return (query.isEmpty || searchable.contains(query)) &&
-        (location.isEmpty || job.location.toLowerCase().contains(location)) &&
-        (type.isEmpty || job.jobType.toLowerCase() == type);
+    return type.isEmpty || job.jobType.toLowerCase() == type;
   }
 }

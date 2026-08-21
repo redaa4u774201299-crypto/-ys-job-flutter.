@@ -9,6 +9,7 @@ import '../../../jobs/presentation/jobs_providers.dart';
 import '../../../jobs/presentation/widgets/firebase_setup_state.dart';
 import '../../../jobs/presentation/widgets/job_summary_card.dart';
 import '../../../../shared/responsive/responsive_builder.dart';
+import '../home_search.dart';
 
 class LandingPage extends ConsumerStatefulWidget {
   const LandingPage({super.key});
@@ -18,17 +19,33 @@ class LandingPage extends ConsumerStatefulWidget {
 
 class _LandingPageState extends ConsumerState<LandingPage> {
   final _searchController = TextEditingController();
+  final _cityController = TextEditingController();
+
   @override
   void dispose() {
     _searchController.dispose();
+    _cityController.dispose();
     super.dispose();
   }
 
   void _search() {
-    final query = _searchController.text.trim();
-    context.go(
-      query.isEmpty ? '/jobs' : '/jobs?q=${Uri.encodeQueryComponent(query)}',
+    FocusScope.of(context).unfocus();
+    final criteria = HomeSearchCriteria(
+      query: _searchController.text,
+      city: _cityController.text,
     );
+    final path = criteria.jobsPath;
+    if (path == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('أدخل كلمة بحث أو اختر مدينة قبل بدء البحث.'),
+          ),
+        );
+      return;
+    }
+    context.go(path);
   }
 
   @override
@@ -88,12 +105,23 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                   _SearchField(
                                     controller: _searchController,
                                     onSearch: _search,
+                                    label: 'المسمى الوظيفي أو الشركة',
+                                    hintText: 'مثال: محاسب أو شركة',
+                                    icon: Icons.search,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _SearchField(
+                                    controller: _cityController,
+                                    onSearch: _search,
+                                    label: 'المدينة',
+                                    hintText: 'مثال: صنعاء',
+                                    icon: Icons.location_on_outlined,
                                   ),
                                   const SizedBox(height: 12),
                                   ElevatedButton.icon(
                                     onPressed: _search,
                                     icon: const Icon(Icons.search),
-                                    label: const Text('ابحث عن وظيفة'),
+                                    label: const Text('ابحث الآن'),
                                   ),
                                 ],
                               )
@@ -103,13 +131,26 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                     child: _SearchField(
                                       controller: _searchController,
                                       onSearch: _search,
+                                      label: 'المسمى الوظيفي أو الشركة',
+                                      hintText: 'مثال: محاسب أو شركة',
+                                      icon: Icons.search,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _SearchField(
+                                      controller: _cityController,
+                                      onSearch: _search,
+                                      label: 'المدينة',
+                                      hintText: 'مثال: صنعاء',
+                                      icon: Icons.location_on_outlined,
                                     ),
                                   ),
                                   const SizedBox(width: 12),
                                   ElevatedButton.icon(
                                     onPressed: _search,
                                     icon: const Icon(Icons.search),
-                                    label: const Text('ابحث'),
+                                    label: const Text('ابحث الآن'),
                                   ),
                                 ],
                               ),
@@ -128,22 +169,32 @@ class _LandingPageState extends ConsumerState<LandingPage> {
 }
 
 class _SearchField extends StatelessWidget {
-  const _SearchField({required this.controller, required this.onSearch});
+  const _SearchField({
+    required this.controller,
+    required this.onSearch,
+    required this.label,
+    required this.hintText,
+    required this.icon,
+  });
 
   final TextEditingController controller;
   final VoidCallback onSearch;
+  final String label;
+  final String hintText;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) => Semantics(
     textField: true,
-    label: 'البحث عن وظيفة أو مهارة',
+    label: label,
     child: TextField(
       controller: controller,
       textInputAction: TextInputAction.search,
       onSubmitted: (_) => onSearch(),
-      decoration: const InputDecoration(
-        prefixIcon: Icon(Icons.search),
-        hintText: 'ابحث عن المسمى الوظيفي أو المهارة',
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        hintText: hintText,
       ),
     ),
   );

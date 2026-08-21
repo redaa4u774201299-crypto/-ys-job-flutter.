@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../search/job_search_index.dart';
+
 enum JobStatus {
   active,
   closed,
@@ -132,6 +134,12 @@ class JobModel {
     'status': status.value,
     'employerName': employerName,
     'employerLogoThumbBase64': employerLogoThumbBase64,
+    // حقول عامة مشتقة لا تحتوي بريدًا أو هاتفًا أو وصفًا أو Base64.
+    'locationKey': JobSearchIndex.normalize(location),
+    'searchTerms': JobSearchIndex.buildTerms(
+      title: title,
+      employerName: employerName,
+    ),
   };
 
   factory JobModel.fromFirestore(

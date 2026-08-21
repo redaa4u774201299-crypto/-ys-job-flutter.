@@ -88,8 +88,10 @@ final appRouterProvider = Provider<GoRouter>(
           GoRoute(path: '/', builder: (context, state) => const LandingPage()),
           GoRoute(
             path: AppRoutes.jobs,
-            builder: (context, state) =>
-                JobsPage(query: state.uri.queryParameters['q']),
+            builder: (context, state) => JobsPage(
+              query: state.uri.queryParameters['q'],
+              city: state.uri.queryParameters['city'],
+            ),
           ),
           GoRoute(
             path: '/companies',

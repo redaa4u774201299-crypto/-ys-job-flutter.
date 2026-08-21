@@ -12,8 +12,9 @@ import '../widgets/job_summary_card.dart';
 import '../jobs_providers.dart';
 
 class JobsPage extends ConsumerStatefulWidget {
-  const JobsPage({super.key, this.query});
+  const JobsPage({super.key, this.query, this.city});
   final String? query;
+  final String? city;
 
   @override
   ConsumerState<JobsPage> createState() => _JobsPageState();
@@ -28,6 +29,7 @@ class _JobsPageState extends ConsumerState<JobsPage> {
   void initState() {
     super.initState();
     _queryController = TextEditingController(text: widget.query ?? '');
+    _locationController.text = widget.city ?? '';
   }
 
   @override
