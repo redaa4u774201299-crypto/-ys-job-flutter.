@@ -19,6 +19,13 @@ void main() {
       );
     });
 
+    test('يبني رابط دخول يحتفظ بتفاصيل الوظيفة كوجهة عودة', () {
+      expect(
+        AppRoutes.loginForJobDetails('firestore-job-42'),
+        '/login?returnTo=%2Fjob-details%2Ffirestore-job-42',
+      );
+    });
+
     test('يعيد توجيه رابط التفاصيل القديم إلى الرابط المعتمد', () {
       expect(
         AppRoutes.redirectLegacyJobDetails('firestore-job-42'),

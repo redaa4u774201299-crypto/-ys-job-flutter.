@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/firebase/firebase_runtime.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/auth/data/auth_service.dart';
 import '../../../../features/jobs/presentation/jobs_providers.dart';
@@ -12,6 +13,7 @@ import '../../../../shared/models/user_model.dart';
 import '../../../../shared/responsive/responsive_builder.dart';
 import '../../../../shared/widgets/base64_thumbnail_avatar.dart';
 import '../../data/applications_repository.dart';
+import '../job_share_service.dart';
 
 class JobDetailsPage extends ConsumerWidget {
   const JobDetailsPage({super.key, required this.jobId});
@@ -41,31 +43,65 @@ class _JobDetails extends ConsumerWidget {
   const _JobDetails({required this.job});
   final JobModel job;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => SingleChildScrollView(
-    padding: const EdgeInsets.all(24),
-    child: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1160),
-        child: ResponsiveBuilder(
-          builder: (context, size) {
-            final details = _DetailsBody(job: job);
-            final sidebar = _JobSidebar(job: job);
-            return size == ResponsiveSize.desktop
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 7, child: details),
-                      const SizedBox(width: 24),
-                      SizedBox(width: 320, child: sidebar),
-                    ],
-                  )
-                : Column(
-                    children: [details, const SizedBox(height: 18), sidebar],
-                  );
-          },
+  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+    appBar: AppBar(
+      title: const Text('تفاصيل الوظيفة'),
+      actions: [_ShareJobButton(job: job)],
+    ),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1160),
+          child: ResponsiveBuilder(
+            builder: (context, size) {
+              final details = _DetailsBody(job: job);
+              final sidebar = _JobSidebar(job: job);
+              return size == ResponsiveSize.desktop
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 7, child: details),
+                        const SizedBox(width: 24),
+                        SizedBox(width: 320, child: sidebar),
+                      ],
+                    )
+                  : Column(
+                      children: [details, const SizedBox(height: 18), sidebar],
+                    );
+            },
+          ),
         ),
       ),
     ),
+  );
+}
+
+class _ShareJobButton extends StatelessWidget {
+  const _ShareJobButton({required this.job});
+
+  final JobModel job;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: 'مشاركة الوظيفة',
+    icon: const Icon(Icons.share_outlined),
+    onPressed: () async {
+      try {
+        final result = await const JobShareService().share(job);
+        if (!context.mounted) return;
+        final message = result == JobShareResult.copiedToClipboard
+            ? 'تم نسخ رابط الوظيفة إلى الحافظة.'
+            : 'فُتحت خيارات مشاركة الوظيفة.';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      } catch (_) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذرت مشاركة الوظيفة. حاول مجددًا.')),
+        );
+      }
+    },
   );
 }
 
@@ -186,7 +222,7 @@ class _ApplyButton extends ConsumerWidget {
       data: (user) {
         if (user == null)
           return ElevatedButton(
-            onPressed: () => context.go('/login'),
+            onPressed: () => context.go(AppRoutes.loginForJobDetails(job.id)),
             child: const Text('سجل الدخول للتقديم'),
           );
         return StreamBuilder<UserModel?>(
@@ -224,6 +260,11 @@ class _ApplyButton extends ConsumerWidget {
                   onPressed: applied
                       ? null
                       : () async {
+                          final confirmed = await showApplyConfirmationDialog(
+                            context,
+                            job,
+                          );
+                          if (!confirmed || !context.mounted) return;
                           try {
                             await ref
                                 .read(applicationsRepositoryProvider)
@@ -257,6 +298,36 @@ class _ApplyButton extends ConsumerWidget {
       },
     );
   }
+}
+
+Future<bool> showApplyConfirmationDialog(
+  BuildContext context,
+  JobModel job,
+) async {
+  final employer = job.employerName.trim().isEmpty
+      ? 'هذه الوظيفة'
+      : 'وظيفة لدى ${job.employerName.trim()}';
+  return await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.assignment_turned_in_outlined),
+          title: const Text('تأكيد التقديم'),
+          content: Text(
+            'هل تريد إرسال طلب التقديم إلى $employer بعنوان «${job.title}»؟',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('تأكيد التقديم'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
 }
 
 class _MetaRow extends StatelessWidget {

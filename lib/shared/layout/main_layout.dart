@@ -23,17 +23,21 @@ class MainLayout extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isJobDetails = GoRouterState.of(context).uri.path
+        .startsWith('/job-details/');
     return ResponsiveBuilder(
       builder: (context, size) {
         final isDesktop = size == ResponsiveSize.desktop;
         return Scaffold(
-          appBar: isDesktop
+          appBar: isDesktop || isJobDetails
               ? null
               : AppBar(
                   title: const _Brand(),
                   actions: const [_NotificationsBell()],
                 ),
-          drawer: isDesktop ? null : const Drawer(child: _MobileNavigation()),
+          drawer: isDesktop || isJobDetails
+              ? null
+              : const Drawer(child: _MobileNavigation()),
           body: Column(
             children: [
               if (isDesktop) const _DesktopNavigation(),

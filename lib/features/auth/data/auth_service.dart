@@ -215,6 +215,25 @@ String destinationForRole(UserRole role) => switch (role) {
   UserRole.seeker => AppRoutes.seekerDashboard,
 };
 
+/// يقبل رابط عودة داخليًا خاصًا بتفاصيل وظيفة فقط.
+///
+/// هذا يمنع إعادة التوجيه إلى مواقع خارجية أو إلى صفحات ذات صلاحيات أعلى عند
+/// تمرير `returnTo` ضمن رابط تسجيل الدخول.
+String? safeJobDetailsReturnTo(String? candidate) {
+  final value = candidate?.trim() ?? '';
+  if (!value.startsWith('/job-details/')) return null;
+
+  final uri = Uri.tryParse(value);
+  if (uri == null || uri.hasScheme || uri.hasAuthority) return null;
+  if (uri.pathSegments.length != 2 || uri.pathSegments.last.trim().isEmpty) {
+    return null;
+  }
+  return uri.toString();
+}
+
+String destinationAfterLogin(UserRole role, {String? returnTo}) =>
+    safeJobDetailsReturnTo(returnTo) ?? destinationForRole(role);
+
 String authFailureMessage(Object error) {
   if (error is FormatException) return error.message;
   if (error is FirebaseAuthException) {

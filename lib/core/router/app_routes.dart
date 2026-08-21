@@ -25,6 +25,10 @@ abstract final class AppRoutes {
   static String jobDetails(String jobId) =>
       '/job-details/${Uri.encodeComponent(jobId)}';
 
+  /// يبني رابط الدخول مع الاحتفاظ بمسار تفاصيل وظيفة واحد فقط كوجهة عودة.
+  static String loginForJobDetails(String jobId) =>
+      '/login?returnTo=${Uri.encodeQueryComponent(jobDetails(jobId))}';
+
   /// يبني رابط إدارة طلبات وظيفة يملكها الحساب الحالي.
   static String employerApplications(String jobId) =>
       '/employer/applications/$jobId';

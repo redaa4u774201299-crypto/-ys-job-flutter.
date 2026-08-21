@@ -43,7 +43,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             email: _emailController.text,
             password: _passwordController.text,
           );
-      if (mounted) context.go(session.destination);
+      if (mounted) {
+        context.go(
+          destinationAfterLogin(
+            session.profile.role,
+            returnTo: _returnToJobDetails(),
+          ),
+        );
+      }
     } catch (error) {
       if (mounted) setState(() => _errorMessage = authFailureMessage(error));
     } finally {
@@ -58,13 +65,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
     try {
       final session = await ref.read(authServiceProvider).signInWithGoogle();
-      if (mounted) context.go(session.destination);
+      if (mounted) {
+        context.go(
+          destinationAfterLogin(
+            session.profile.role,
+            returnTo: _returnToJobDetails(),
+          ),
+        );
+      }
     } catch (error) {
       if (mounted) setState(() => _errorMessage = authFailureMessage(error));
     } finally {
       if (mounted) setState(() => _isBusy = false);
     }
   }
+
+  String? _returnToJobDetails() =>
+      GoRouterState.of(context).uri.queryParameters['returnTo'];
 
   Future<void> _showPasswordResetDialog() async {
     final resetFormKey = GlobalKey<FormState>();
