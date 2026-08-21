@@ -19,7 +19,11 @@ abstract final class AppRoutes {
       '/employer/jobs/:jobId/applications';
 
   /// يبني رابط تفاصيل الوظيفة من معرّف Firestore الحقيقي دون تكرار نص المسار.
-  static String jobDetails(String jobId) => '/job-details/$jobId';
+  ///
+  /// يُرمَّز المعرّف حتى يبقى رابط الويب صالحًا وقابلًا للمشاركة إذا احتوى على
+  /// رموز خاصة، مع بقاء مسار go_router الموحد هو نقطة الدخول للرابط العميق.
+  static String jobDetails(String jobId) =>
+      '/job-details/${Uri.encodeComponent(jobId)}';
 
   /// يبني رابط إدارة طلبات وظيفة يملكها الحساب الحالي.
   static String employerApplications(String jobId) =>

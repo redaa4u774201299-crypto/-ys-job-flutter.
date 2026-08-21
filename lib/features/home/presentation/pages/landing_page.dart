@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/firebase/firebase_runtime.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../jobs/data/jobs_repository.dart';
 import '../../../jobs/presentation/jobs_providers.dart';
 import '../../../jobs/presentation/widgets/firebase_setup_state.dart';
@@ -261,9 +262,8 @@ class _LatestJobsSection extends ConsumerWidget {
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: JobSummaryCard(
                                   job: job,
-                                  onTap: () => context.go(
-                                    '/job-details/${Uri.encodeComponent(job.id)}',
-                                  ),
+                                  onTap: () =>
+                                      context.go(AppRoutes.jobDetails(job.id)),
                                 ),
                               ),
                             ),

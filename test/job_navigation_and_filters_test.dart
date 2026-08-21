@@ -12,6 +12,13 @@ void main() {
       );
     });
 
+    test('يرمّز معرّف الوظيفة عند بناء رابط ويب قابل للمشاركة', () {
+      expect(
+        AppRoutes.jobDetails('job id/2026'),
+        '/job-details/job%20id%2F2026',
+      );
+    });
+
     test('يعيد توجيه رابط التفاصيل القديم إلى الرابط المعتمد', () {
       expect(
         AppRoutes.redirectLegacyJobDetails('firestore-job-42'),
