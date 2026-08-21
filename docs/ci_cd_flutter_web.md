@@ -57,6 +57,19 @@ https://redaa4u774201299-crypto.github.io/-ys-job-flutter./
 
 قبل رفع أي تغيير على القواعد، شغّل محليًا الأمر `npm run test:firestore-rules`. عند فشله، أوقف التعديل بدل توسيع القاعدة لتجاوز الاختبار؛ يجب أن يعكس الاختبار سياسة الوصول المقصودة بدقة. تستخدم اختبارات القواعد مشروعًا تجريبيًا ولا تنشئ أو تغير بيانات Firebase الإنتاجية. [4] [5]
 
+## مراقبة فشل بوابة الأمان
+
+يستمع المسار المستقل `.github/workflows/security-ci-alert.yml` إلى اكتمال **Flutter Web CI**. لا ينشئ إشعارًا عند أي فشل عام؛ بل يستعلم عن مهام التشغيل ويتحقق صراحةً من أن خطوة **Run Firestore Security Rules tests** هي التي فشلت. عند ذلك ينشئ تذكرة GitHub بعلامة `security-ci` أو يضيف تعليقًا إلى التذكرة المفتوحة نفسها بدل تكرار التنبيهات. يؤدي ظهور التذكرة إلى تفعيل إشعارات GitHub المعتادة وفق تفضيلات مالك المستودع ومراقبيه.
+
+لا يفحص مسار التنبيه كود طلب الدمج ولا ينزّل آثاره ولا يستعمل أسرارًا خارجية. يقتصر على بيانات تشغيل Actions وواجهة Issues، ويشترط أن يأتي الفرع من المستودع نفسه قبل منحه صلاحية إنشاء التذكرة. هذه العزلة مهمة لأن سير العمل الذي يبدأ بعد اكتمال سير آخر يحتاج صلاحيات قليلة جدًا ويجب ألا يعيد تنفيذ محتوى غير موثوق. [6] [7]
+
+| أسلوب التنبيه | النتيجة | الإعداد | متى يُفضّل |
+| --- | --- | --- | --- |
+| **تذكرة GitHub المدمجة — مفعّل** | تذكرة واحدة قابلة للتتبع وتعليقات على الفشل المتكرر | لا أسرار؛ يتطلب السماح لـ`GITHUB_TOKEN` بكتابة Issues | المراقبة الأساسية ومتابعة العلاج داخل المستودع |
+| قناة خارجية اختيارية | رسالة فورية إلى Slack أو Teams أو Telegram أو بريد مؤسسي | URL أو رمز قناة محفوظ كـGitHub Secret، مع إخفاء السجلات | عند الحاجة إلى إشعار خارج GitHub أو فريق مناوب |
+
+> قبل إضافة قناة خارجية، احفظ عنوان الـWebhook أو الرمز داخل **Settings → Secrets and variables → Actions** فقط. لا تضعه في YAML أو في سجل Actions، ولا ترسل نصوصًا من سجلات الاختبارات لأنها قد تتضمن سياقًا لا يلزم كشفه. أضف الإرسال إلى مسار التنبيه المستقل فقط، بعد أن ينشئ أو يحدّث التذكرة الداخلية.
+
 ## تفعيل مسار التحقق
 
 أُعد رابط `origin` محليًا للمستودع، لكن لم يُرفع فرع `main` بنجاح بعد. بعد رفع الفرع مرة واحدة، سيظهر سير عمل **Flutter Web CI** في تبويب **Actions**. يمكن تشغيل فحوصات CI يدويًا من زر **Run workflow**، أما النشر فيحدث فقط مع دفع جديد إلى `main`.
@@ -74,3 +87,5 @@ https://redaa4u774201299-crypto.github.io/-ys-job-flutter./
 [3]: https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages "GitHub Docs — Using custom workflows with GitHub Pages"
 [4]: https://firebase.google.com/docs/firestore/security/test-rules-emulator "Firebase: Test your Cloud Firestore Security Rules"
 [5]: https://firebase.google.com/docs/rules/unit-tests "Firebase: Build unit tests for Security Rules"
+[6]: https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#workflow_run "GitHub Docs — workflow_run event"
+[7]: https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#permissions "GitHub Docs — Workflow permissions"

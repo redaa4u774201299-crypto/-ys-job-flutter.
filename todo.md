@@ -128,3 +128,5 @@
 - [x] توثيق تشديد قواعد Firestore لمجموعة `company_directory` ومنع نشر الحقول غير المسموح بها.
 - [x] توثيق إعداد اختبار محلي لتزامن كتابة ملف الشركة ودليله العام ذريًا عبر Firebase Emulator.
 - [x] دمج اختبارات قواعد Firestore عبر Firebase Emulator ضمن GitHub Actions قبل بناء Flutter Web والنشر إلى Pages.
+- [x] إضافة مراقبة لفشل اختبارات قواعد Firestore في GitHub Actions مع إشعار آمن لا يعتمد على بيانات اعتماد الإنتاج.
+- [x] إنشاء مهارة قابلة لإعادة الاستخدام لإعداد قواعد Firestore واختبارات Emulator ومراقبة فشل CI.
