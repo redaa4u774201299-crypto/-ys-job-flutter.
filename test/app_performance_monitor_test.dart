@@ -42,6 +42,20 @@ void main() {
       expect(factory.trace.stopped, isTrue);
     });
 
+    test('يسمح بقياس تقديم طلب وظيفة باسم ثابت وآمن', () async {
+      final factory = _FakeTraceFactory();
+      final monitor = FirebaseAppPerformanceMonitor(
+        traceFactory: factory,
+        isEnabled: true,
+      );
+
+      await monitor.measure<void>('application_submit', () async {});
+
+      expect(factory.trace.started, isTrue);
+      expect(factory.trace.attributes, {'outcome': 'success'});
+      expect(factory.trace.stopped, isTrue);
+    });
+
     test('ينهي قياس أول استجابة من stream بعد وصول القائمة', () async {
       final factory = _FakeTraceFactory();
       final monitor = FirebaseAppPerformanceMonitor(

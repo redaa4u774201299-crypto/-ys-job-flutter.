@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase/firebase_runtime.dart';
+import '../../../core/monitoring/app_performance_monitor.dart';
 import '../../../shared/models/application_model.dart';
 import '../../../shared/models/job_model.dart';
 import '../../../shared/models/user_model.dart';
@@ -15,17 +16,26 @@ final applicationsRepositoryProvider = Provider<ApplicationsRepository>((ref) {
     FirebaseFirestore.instance,
     FirebaseAuth.instance,
     ref.watch(notificationsRepositoryProvider),
+    ref.watch(appPerformanceMonitorProvider),
   );
 });
 
 class ApplicationsRepository {
-  ApplicationsRepository(this._firestore, this._auth, this._notifications);
+  ApplicationsRepository(
+    this._firestore,
+    this._auth,
+    this._notifications,
+    this._performanceMonitor,
+  );
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   final NotificationsRepository _notifications;
+  final AppPerformanceMonitor _performanceMonitor;
 
-  Future<void> applyToJob(JobModel job) async {
+  Future<void> applyToJob(
+    JobModel job,
+  ) => _performanceMonitor.measure<void>('application_submit', () async {
     final seeker = _auth.currentUser;
     if (seeker == null)
       throw StateError('سجل الدخول أولًا للتقديم على الوظيفة.');
@@ -71,7 +81,7 @@ class ApplicationsRepository {
         'appliedAt': FieldValue.serverTimestamp(),
       });
     });
-  }
+  });
 
   Stream<bool> watchApplicationState(String jobId) {
     final seeker = _auth.currentUser;

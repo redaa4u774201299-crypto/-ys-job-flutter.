@@ -10,6 +10,7 @@ const performanceTraceNames = <String>{
   'jobs_initial_load',
   'company_directory_load',
   'profile_save',
+  'application_submit',
 };
 
 /// يوفّر غلافًا قابلًا للاختبار حول Firebase Performance ويمنع تعطل تدفق
