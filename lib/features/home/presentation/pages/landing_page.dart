@@ -20,28 +20,23 @@ class LandingPage extends ConsumerStatefulWidget {
 
 class _LandingPageState extends ConsumerState<LandingPage> {
   final _searchController = TextEditingController();
-  final _cityController = TextEditingController();
 
   @override
   void dispose() {
     _searchController.dispose();
-    _cityController.dispose();
     super.dispose();
   }
 
   void _search() {
     FocusScope.of(context).unfocus();
-    final criteria = HomeSearchCriteria(
-      query: _searchController.text,
-      city: _cityController.text,
-    );
+    final criteria = HomeSearchCriteria(query: _searchController.text);
     final path = criteria.jobsPath;
     if (path == null) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('أدخل كلمة بحث أو اختر مدينة قبل بدء البحث.'),
+            content: Text('أدخل مسمى وظيفيًا أو اسم شركة قبل بدء البحث.'),
           ),
         );
       return;
@@ -111,14 +106,6 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                     icon: Icons.search,
                                   ),
                                   const SizedBox(height: 12),
-                                  _SearchField(
-                                    controller: _cityController,
-                                    onSearch: _search,
-                                    label: 'المدينة',
-                                    hintText: 'مثال: صنعاء',
-                                    icon: Icons.location_on_outlined,
-                                  ),
-                                  const SizedBox(height: 12),
                                   ElevatedButton.icon(
                                     onPressed: _search,
                                     icon: const Icon(Icons.search),
@@ -135,16 +122,6 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                       label: 'المسمى الوظيفي أو الشركة',
                                       hintText: 'مثال: محاسب أو شركة',
                                       icon: Icons.search,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _SearchField(
-                                      controller: _cityController,
-                                      onSearch: _search,
-                                      label: 'المدينة',
-                                      hintText: 'مثال: صنعاء',
-                                      icon: Icons.location_on_outlined,
                                     ),
                                   ),
                                   const SizedBox(width: 12),
