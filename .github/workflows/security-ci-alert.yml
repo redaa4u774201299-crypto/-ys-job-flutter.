@@ -1,6 +1,6 @@
 name: Firestore Security CI Alert
 
-on:
+"on":
   workflow_run:
     workflows: [Flutter Web CI]
     types: [completed]
