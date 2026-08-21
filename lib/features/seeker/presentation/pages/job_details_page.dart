@@ -13,6 +13,7 @@ import '../../../../shared/models/user_model.dart';
 import '../../../../shared/responsive/responsive_builder.dart';
 import '../../../../shared/widgets/base64_thumbnail_avatar.dart';
 import '../../data/applications_repository.dart';
+import '../application_submission_state.dart';
 import '../job_share_service.dart';
 
 class JobDetailsPage extends ConsumerWidget {
@@ -210,11 +211,20 @@ class _JobSidebar extends ConsumerWidget {
   }
 }
 
-class _ApplyButton extends ConsumerWidget {
+class _ApplyButton extends ConsumerStatefulWidget {
   const _ApplyButton({required this.job});
   final JobModel job;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ApplyButton> createState() => _ApplyButtonState();
+}
+
+class _ApplyButtonState extends ConsumerState<_ApplyButton> {
+  bool _isSubmitting = false;
+  bool _isAppliedLocally = false;
+
+  @override
+  Widget build(BuildContext context) {
     final auth = ref.watch(authStateProvider);
     return auth.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -222,7 +232,8 @@ class _ApplyButton extends ConsumerWidget {
       data: (user) {
         if (user == null)
           return ElevatedButton(
-            onPressed: () => context.go(AppRoutes.loginForJobDetails(job.id)),
+            onPressed: () =>
+                context.go(AppRoutes.loginForJobDetails(widget.job.id)),
             child: const Text('سجل الدخول للتقديم'),
           );
         return StreamBuilder<UserModel?>(
@@ -253,43 +264,21 @@ class _ApplyButton extends ConsumerWidget {
             return StreamBuilder<bool>(
               stream: ref
                   .read(applicationsRepositoryProvider)
-                  .watchApplicationState(job.id),
+                  .watchApplicationState(widget.job.id),
               builder: (context, appliedSnapshot) {
-                final applied = appliedSnapshot.data == true;
+                final submission = ApplicationSubmissionState(
+                  isSubmitting: _isSubmitting,
+                  isApplied: _isAppliedLocally || appliedSnapshot.data == true,
+                );
                 return ElevatedButton(
-                  onPressed: applied
-                      ? null
-                      : () async {
-                          final confirmed = await showApplyConfirmationDialog(
-                            context,
-                            job,
-                          );
-                          if (!confirmed || !context.mounted) return;
-                          try {
-                            await ref
-                                .read(applicationsRepositoryProvider)
-                                .applyToJob(job);
-                            if (context.mounted)
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('تم إرسال طلب التقديم.'),
-                                ),
-                              );
-                          } catch (error) {
-                            if (context.mounted)
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    error.toString().replaceFirst(
-                                      'Bad state: ',
-                                      '',
-                                    ),
-                                  ),
-                                ),
-                              );
-                          }
-                        },
-                  child: Text(applied ? 'تم التقديم' : 'تقديم الآن'),
+                  onPressed: submission.isDisabled ? null : _confirmAndApply,
+                  child: submission.isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(submission.label),
                 );
               },
             );
@@ -297,6 +286,32 @@ class _ApplyButton extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _confirmAndApply() async {
+    final confirmed = await showApplyConfirmationDialog(context, widget.job);
+    if (!confirmed || !mounted) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      await ref.read(applicationsRepositoryProvider).applyToJob(widget.job);
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _isAppliedLocally = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم إرسال طلب التقديم بنجاح.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Bad state: ', '')),
+        ),
+      );
+    }
   }
 }
 

@@ -158,7 +158,10 @@ service cloud.firestore {
         currentProfile().data.role == 'seeker' &&
         request.resource.data.id == applicationId &&
         request.resource.data.seekerId == request.auth.uid &&
+        request.resource.data.applicantId == request.auth.uid &&
+        request.resource.data.applicantId == request.resource.data.seekerId &&
         request.resource.data.status == 'pending' &&
+        request.resource.data.appliedAt is timestamp &&
         exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)) &&
         job(request.resource.data.jobId).data.employerId ==
           request.resource.data.employerId &&
@@ -172,6 +175,7 @@ service cloud.firestore {
           resource.data.employerId == request.auth.uid &&
           request.resource.data.jobId == resource.data.jobId &&
           request.resource.data.seekerId == resource.data.seekerId &&
+          request.resource.data.applicantId == resource.data.applicantId &&
           request.resource.data.employerId == resource.data.employerId &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status'

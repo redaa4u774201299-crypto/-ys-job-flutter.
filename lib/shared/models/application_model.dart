@@ -43,10 +43,17 @@ class ApplicationModel {
   final ApplicationStatus status;
   final DateTime appliedAt;
 
+  /// اسم أوضح لهوية مقدم الطلب في وثائق Firestore الجديدة.
+  ///
+  /// يبقى [seekerId] متاحًا لتوافق الشاشات والسجلات الأقدم، وتُكتب القيمتان
+  /// متماثلتين لحماية سلامة هوية مقدم الطلب.
+  String get applicantId => seekerId;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'jobId': jobId,
     'seekerId': seekerId,
+    'applicantId': applicantId,
     'employerId': employerId,
     'status': status.value,
     'appliedAt': appliedAt.toUtc().toIso8601String(),
@@ -56,7 +63,7 @@ class ApplicationModel {
       ApplicationModel(
         id: _text(json['id']),
         jobId: _text(json['jobId']),
-        seekerId: _text(json['seekerId']),
+        seekerId: _firstText(json['applicantId'], json['seekerId']),
         employerId: _text(json['employerId']),
         status: ApplicationStatus.fromValue(_text(json['status'])),
         appliedAt:
@@ -68,6 +75,7 @@ class ApplicationModel {
     'id': id,
     'jobId': jobId,
     'seekerId': seekerId,
+    'applicantId': applicantId,
     'employerId': employerId,
     'status': status.value,
     'appliedAt': Timestamp.fromDate(appliedAt.toUtc()),
@@ -84,6 +92,11 @@ class ApplicationModel {
 String _text(dynamic value) {
   final text = value?.toString().trim() ?? '';
   return text == 'null' ? '' : text;
+}
+
+String _firstText(dynamic primary, dynamic fallback) {
+  final primaryText = _text(primary);
+  return primaryText.isEmpty ? _text(fallback) : primaryText;
 }
 
 DateTime? _date(dynamic value) {
