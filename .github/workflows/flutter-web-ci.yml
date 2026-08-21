@@ -70,6 +70,9 @@ jobs:
       - name: Build Flutter Web
         run: flutter build web --no-tree-shake-icons --base-href=/-ys-job-flutter./
 
+      - name: Add GitHub Pages route fallback
+        run: cp build/web/index.html build/web/404.html
+
       - name: Upload web build artifact
         uses: actions/upload-artifact@v4
         with:
