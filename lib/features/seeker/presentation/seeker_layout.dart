@@ -13,20 +13,20 @@ class SeekerLayout extends ConsumerWidget {
 
   final Widget child;
 
-  static const _destinations = <_SeekerDestination>[
-    _SeekerDestination(
-      label: 'البحث',
+  static const navigationDestinations = <SeekerNavigationDestination>[
+    SeekerNavigationDestination(
+      label: 'البحث عن وظائف',
       icon: Icons.search_outlined,
       selectedIcon: Icons.search,
       path: AppRoutes.seekerSearch,
     ),
-    _SeekerDestination(
+    SeekerNavigationDestination(
       label: 'طلباتي',
       icon: Icons.assignment_outlined,
       selectedIcon: Icons.assignment,
       path: AppRoutes.seekerApplications,
     ),
-    _SeekerDestination(
+    SeekerNavigationDestination(
       label: 'ملفي الشخصي',
       icon: Icons.person_outline,
       selectedIcon: Icons.person,
@@ -40,7 +40,6 @@ class SeekerLayout extends ConsumerWidget {
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= 980;
         final currentPath = GoRouterState.of(context).uri.path;
-        final selectedIndex = _selectedIndex(currentPath);
         return Scaffold(
           appBar: AppBar(
             title: const Text('مساحة الباحث عن عمل'),
@@ -53,8 +52,20 @@ class SeekerLayout extends ConsumerWidget {
               ),
             ],
           ),
+          drawer: isDesktop
+              ? null
+              : Drawer(
+                  child: SafeArea(
+                    child: _SeekerSidebar(
+                      seekerName: seeker.name,
+                      currentPath: currentPath,
+                      closeOnNavigate: true,
+                    ),
+                  ),
+                ),
           body: isDesktop
               ? Row(
+                  textDirection: TextDirection.ltr,
                   children: [
                     Expanded(child: child),
                     SizedBox(
@@ -70,33 +81,10 @@ class SeekerLayout extends ConsumerWidget {
                   ],
                 )
               : child,
-          bottomNavigationBar: isDesktop
-              ? null
-              : NavigationBar(
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: (index) =>
-                      context.go(_destinations[index].path),
-                  destinations: _destinations
-                      .map(
-                        (destination) => NavigationDestination(
-                          icon: Icon(destination.icon),
-                          selectedIcon: Icon(destination.selectedIcon),
-                          label: destination.label,
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
         );
       },
     ),
   );
-
-  int _selectedIndex(String currentPath) {
-    final index = _destinations.indexWhere(
-      (destination) => currentPath == destination.path,
-    );
-    return index < 0 ? 1 : index;
-  }
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     await ref.read(authServiceProvider).signOut();
@@ -105,10 +93,15 @@ class SeekerLayout extends ConsumerWidget {
 }
 
 class _SeekerSidebar extends StatelessWidget {
-  const _SeekerSidebar({required this.seekerName, required this.currentPath});
+  const _SeekerSidebar({
+    required this.seekerName,
+    required this.currentPath,
+    this.closeOnNavigate = false,
+  });
 
   final String seekerName;
   final String currentPath;
+  final bool closeOnNavigate;
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -139,7 +132,7 @@ class _SeekerSidebar extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 20),
-      ...SeekerLayout._destinations.map(
+      ...SeekerLayout.navigationDestinations.map(
         (destination) => ListTile(
           selected: currentPath == destination.path,
           selectedTileColor: const Color(0x1AD9A441),
@@ -153,15 +146,18 @@ class _SeekerSidebar extends StatelessWidget {
             color: currentPath == destination.path ? AppColors.navy : null,
           ),
           title: Text(destination.label),
-          onTap: () => context.go(destination.path),
+          onTap: () {
+            if (closeOnNavigate) Navigator.of(context).pop();
+            context.go(destination.path);
+          },
         ),
       ),
     ],
   );
 }
 
-class _SeekerDestination {
-  const _SeekerDestination({
+class SeekerNavigationDestination {
+  const SeekerNavigationDestination({
     required this.label,
     required this.icon,
     required this.selectedIcon,

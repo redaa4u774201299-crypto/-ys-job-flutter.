@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ys_job/core/router/app_routes.dart';
+import 'package:ys_job/features/seeker/presentation/seeker_layout.dart';
 import 'package:ys_job/features/seeker/presentation/widgets/seeker_access_gate.dart';
 import 'package:ys_job/shared/models/user_model.dart';
 
@@ -46,6 +47,22 @@ void main() {
         AppRoutes.seekerApplications,
         AppRoutes.seekerProfile,
       }, hasLength(3));
+    });
+
+    test('تستخدم قائمة Sidebar وDrawer الموحدة عناصر التنقل المطلوبة', () {
+      final destinations = SeekerLayout.navigationDestinations;
+
+      expect(destinations, hasLength(3));
+      expect(destinations.map((destination) => destination.label), [
+        'البحث عن وظائف',
+        'طلباتي',
+        'ملفي الشخصي',
+      ]);
+      expect(destinations.map((destination) => destination.path), [
+        AppRoutes.seekerSearch,
+        AppRoutes.seekerApplications,
+        AppRoutes.seekerProfile,
+      ]);
     });
   });
 }
