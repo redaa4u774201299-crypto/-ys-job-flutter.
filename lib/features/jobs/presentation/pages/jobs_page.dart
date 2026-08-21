@@ -9,6 +9,7 @@ import '../../data/jobs_repository.dart';
 import '../../../../shared/responsive/responsive_builder.dart';
 import '../widgets/firebase_setup_state.dart';
 import '../widgets/job_summary_card.dart';
+import '../job_pagination_scroll.dart';
 import '../jobs_providers.dart';
 
 class JobsPage extends ConsumerStatefulWidget {
@@ -298,8 +299,15 @@ class _PaginatedJobsListState extends ConsumerState<_PaginatedJobsList> {
   }
 
   void _loadNextPageIfNeeded() {
-    if (!_scrollController.hasClients ||
-        _scrollController.position.extentAfter > 360) {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    if (!shouldLoadNextJobsPage(
+      pixels: position.pixels,
+      maxScrollExtent: position.maxScrollExtent,
+    )) {
       return;
     }
     ref.read(paginatedJobsProvider(widget.filters).notifier).loadMore();
