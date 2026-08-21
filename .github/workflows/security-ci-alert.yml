@@ -18,6 +18,10 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      SLACK_SECURITY_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
+      TELEGRAM_SECURITY_BOT_TOKEN: ${{ secrets.TELEGRAM_SECURITY_BOT_TOKEN }}
+      TELEGRAM_SECURITY_CHAT_ID: ${{ secrets.TELEGRAM_SECURITY_CHAT_ID }}
 
     steps:
       - name: Create or update a security alert issue
@@ -110,7 +114,7 @@ jobs:
             core.notice(`Created security alert issue #${issue.number}.`);
 
       - name: Send optional Slack security notification
-        if: steps.security_rules_failure.outputs.security_rules_failed == 'true' && secrets.SLACK_SECURITY_WEBHOOK_URL != ''
+        if: steps.security_rules_failure.outputs.security_rules_failed == 'true' && env.SLACK_SECURITY_WEBHOOK_URL != ''
         env:
           SLACK_SECURITY_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
           RUN_URL: ${{ github.event.workflow_run.html_url }}
@@ -129,7 +133,7 @@ jobs:
             "$SLACK_SECURITY_WEBHOOK_URL"
 
       - name: Send optional Telegram security notification
-        if: steps.security_rules_failure.outputs.security_rules_failed == 'true' && secrets.TELEGRAM_SECURITY_BOT_TOKEN != '' && secrets.TELEGRAM_SECURITY_CHAT_ID != ''
+        if: steps.security_rules_failure.outputs.security_rules_failed == 'true' && env.TELEGRAM_SECURITY_BOT_TOKEN != '' && env.TELEGRAM_SECURITY_CHAT_ID != ''
         env:
           TELEGRAM_SECURITY_BOT_TOKEN: ${{ secrets.TELEGRAM_SECURITY_BOT_TOKEN }}
           TELEGRAM_SECURITY_CHAT_ID: ${{ secrets.TELEGRAM_SECURITY_CHAT_ID }}
