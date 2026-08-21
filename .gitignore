@@ -32,6 +32,7 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/node_modules/
 
 # Symbolication related
 app.*.symbols
@@ -43,6 +44,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Node.js tooling used only for Firebase Emulator Security Rules tests
+npm-debug.log*
 
 # Widget Preview related
 .widget_preview/

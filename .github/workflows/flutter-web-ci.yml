@@ -24,6 +24,22 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Set up Node.js for Firebase Rules tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Firebase Rules test dependencies
+        run: npm ci
+
+      - name: Download Cloud Firestore Emulator
+        run: npx firebase setup:emulators:firestore
+
+      - name: Run Firestore Security Rules tests
+        run: npm run test:firestore-rules
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:

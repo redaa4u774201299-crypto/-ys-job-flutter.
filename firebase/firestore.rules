@@ -84,9 +84,42 @@ service cloud.firestore {
     }
 
     // مصدر عام محدود لدليل الشركات. لا يقرأ الزوار أي مستند من users.
+    function isSafeCompanyDirectoryEntry(companyId) {
+      return request.resource.data.keys().hasAll([
+          'id',
+          'name',
+          'industry',
+          'description',
+          'logoThumbBase64',
+          'city'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'id',
+          'name',
+          'industry',
+          'description',
+          'logoThumbBase64',
+          'city'
+        ]) &&
+        request.resource.data.id == companyId &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() <= 120 &&
+        request.resource.data.industry is string &&
+        request.resource.data.industry.size() <= 100 &&
+        request.resource.data.description is string &&
+        request.resource.data.description.size() <= 2000 &&
+        request.resource.data.city is string &&
+        request.resource.data.city.size() <= 80 &&
+        request.resource.data.logoThumbBase64 is string &&
+        request.resource.data.logoThumbBase64.size() <= 16384;
+    }
+
     match /company_directory/{companyId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == companyId;
+      allow create, update: if isSafeCompanyDirectoryEntry(companyId) &&
+        (isAdmin() || (isEmployer() && request.auth.uid == companyId));
+      allow delete: if isAdmin() ||
+        (isEmployer() && request.auth.uid == companyId);
     }
 
     match /jobs/{jobId} {
@@ -196,6 +229,11 @@ service cloud.firestore {
         job(request.resource.data.jobId).data.isFeatured == false;
 
       allow update, delete: if isAdmin();
+    }
+
+    // أي مجموعة جديدة غير مغطاة صراحةً تبقى مغلقة افتراضيًا.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

@@ -6,6 +6,7 @@
 
 | المرحلة            | الغرض                                                                            | يمنع دمج                                             |
 | ------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| اختبارات قواعد Firestore | تثبيت اعتماديات Node وتشغيل Firebase Emulator مع اختبارات `company_directory` | توسيع الصلاحيات أو تسريب الحقول الخاصة أو كسر الذرية |
 | استعادة الاعتمادات | تنفيذ `flutter pub get` من ملف القفل                                             | اختلاف الاعتمادات بين الجهاز والخادم                 |
 | تنسيق Dart         | تنفيذ `dart format --set-exit-if-changed lib test`                               | إدخال كود غير منسق                                   |
 | التحليل الساكن     | تنفيذ `flutter analyze`                                                          | أخطاء النوع والاستيراد والتحذيرات التحليلية          |
@@ -17,6 +18,8 @@
 | نشر Pages          | نشر الحزمة بعد اكتمال وظيفة التحقق بنجاح                                         | نشر نسخة لم تجتز التحليل والاختبارات                 |
 
 حُدّد إصدار Flutter في المسار عند `3.47.1`، وهو الإصدار المستخدم عند إضافة المسار. يستعمل الاختبار المتصفحي متغير `CHROME_EXECUTABLE` لاختيار اسم المتصفح الفعلي تلقائيًا، لذلك لا يعتمد على وجود اسم ثنائي محدد فقط. ناتج البناء يُرفع كأثر قابل للتحميل باستعمال آلية الآثار الرسمية في GitHub Actions.[2]
+
+تبدأ الوظيفة الآن بإعداد Node.js 22 وتنفيذ `npm ci` من `package-lock.json`، ثم تنزيل Cloud Firestore Emulator وتشغيل `npm run test:firestore-rules`. يستخدم هذا الأمر مشروعًا تجريبيًا باسم `demo-ysjob`، ولذلك لا يحتاج بيانات اعتماد Firebase ولا يستطيع الوصول إلى خدمات المشروع الحقيقي غير المحاكية. لا ينتقل المسار إلى Flutter أو إلى بناء Pages إلا بعد اجتياز اختبارات القواعد بنجاح. [4]
 
 ## الخيارات المتاحة
 
@@ -41,11 +44,24 @@ https://redaa4u774201299-crypto.github.io/-ys-job-flutter./
 
 يتضمن أمر البناء `--base-href=/-ys-job-flutter./` لأن GitHub Pages ينشر مواقع المستودعات تحت مسار اسم المستودع، وليس تحت جذر النطاق. ويمنع ذلك ظهور صفحة فارغة أو تعذر تحميل JavaScript وملفات الأصول عند فتح التطبيق من الرابط المنشور.
 
+## اختبار قواعد Firestore داخل CI
+
+يحمل `firebase.json` القواعد من `firebase/firestore.rules` ويشغّل المحاكي على المنفذ `8181` محليًا. أما في GitHub Actions فلا يحتاج الاختبار إلى فتح هذا المنفذ أو إدارته يدويًا؛ إذ تتولى `firebase emulators:exec` بدء المحاكي، وحقن عنوانه إلى عملية Vitest، ثم إيقافه حتى عند انتهاء الاختبار بالفشل.
+
+| ملف | مسؤوليته في التحقق المستمر |
+|---|---|
+| `package.json` و`package-lock.json` | يثبتان إصدارات Firebase Tools ومكتبة اختبار القواعد وVitest. |
+| `.firebaserc` | يفرض مشروعًا تجريبيًا `demo-ysjob` لعزل الاختبارات عن الإنتاج. |
+| `firebase.json` | يربط المحاكي بملف القواعد الحقيقي للمشروع. |
+| `test/firestore_rules/company_directory.rules.test.mjs` | يختبر القراءة العامة المسموح بها، حظر الوصول إلى `users` الخاصة، حظر الكتابة المتقاطعة، وذرية الدفعات عند رفض حقل حساس. |
+
+قبل رفع أي تغيير على القواعد، شغّل محليًا الأمر `npm run test:firestore-rules`. عند فشله، أوقف التعديل بدل توسيع القاعدة لتجاوز الاختبار؛ يجب أن يعكس الاختبار سياسة الوصول المقصودة بدقة. تستخدم اختبارات القواعد مشروعًا تجريبيًا ولا تنشئ أو تغير بيانات Firebase الإنتاجية. [4] [5]
+
 ## تفعيل مسار التحقق
 
 أُعد رابط `origin` محليًا للمستودع، لكن لم يُرفع فرع `main` بنجاح بعد. بعد رفع الفرع مرة واحدة، سيظهر سير عمل **Flutter Web CI** في تبويب **Actions**. يمكن تشغيل فحوصات CI يدويًا من زر **Run workflow**، أما النشر فيحدث فقط مع دفع جديد إلى `main`.
 
-لجعل نجاح التحقق شرطًا قبل الدمج، فعّل حماية الفرع `main` من إعدادات المستودع، ثم اختر **Require status checks to pass before merging** وحدد فحص **Analyze, test, and build Flutter Web**. لا يتطلب المسار مفاتيح Firebase أو أسرارًا؛ فهو يقتصر على التحليل والاختبارات والبناء ونشر الملفات الثابتة الناتجة، ولا يكتب في Firestore.
+لجعل نجاح التحقق شرطًا قبل الدمج، فعّل حماية الفرع `main` من إعدادات المستودع، ثم اختر **Require status checks to pass before merging** وحدد فحص **Analyze, test, and build Flutter Web**. لا يتطلب المسار مفاتيح Firebase أو أسرارًا؛ فهو يقتصر على التحليل واختبارات Flutter واختبارات القواعد داخل محاكي معزول والبناء ونشر الملفات الثابتة الناتجة، ولا يكتب في Firestore الإنتاجي.
 
 ## تحديث إصدار Flutter
 
@@ -56,3 +72,5 @@ https://redaa4u774201299-crypto.github.io/-ys-job-flutter./
 [1]: https://docs.github.com/actions/using-workflows/events-that-trigger-workflows "GitHub Docs — Events that trigger workflows"
 [2]: https://docs.github.com/en/actions/tutorials/store-and-share-data "GitHub Docs — Store and share data with workflow artifacts"
 [3]: https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages "GitHub Docs — Using custom workflows with GitHub Pages"
+[4]: https://firebase.google.com/docs/firestore/security/test-rules-emulator "Firebase: Test your Cloud Firestore Security Rules"
+[5]: https://firebase.google.com/docs/rules/unit-tests "Firebase: Build unit tests for Security Rules"
