@@ -70,6 +70,17 @@ https://redaa4u774201299-crypto.github.io/-ys-job-flutter./
 
 > قبل إضافة قناة خارجية، احفظ عنوان الـWebhook أو الرمز داخل **Settings → Secrets and variables → Actions** فقط. لا تضعه في YAML أو في سجل Actions، ولا ترسل نصوصًا من سجلات الاختبارات لأنها قد تتضمن سياقًا لا يلزم كشفه. أضف الإرسال إلى مسار التنبيه المستقل فقط، بعد أن ينشئ أو يحدّث التذكرة الداخلية.
 
+### Slack وTelegram كقنوات خارجية اختيارية
+
+لا تتطلب القناتان أي سر لتشغيل بوابة الاختبار أو بناء Flutter. لتفعيلهما، أضف القيم التالية من **Settings → Secrets and variables → Actions** في GitHub؛ لا تضعها في متغير Actions عادي أو ملف `.env` أو أي ملف ضمن المستودع.
+
+| القناة | أسرار GitHub المطلوبة | الاستخدام |
+| --- | --- | --- |
+| Slack | `SLACK_SECURITY_WEBHOOK_URL` | رابط Incoming Webhook لقناة التنبيهات الأمنية. |
+| Telegram | `TELEGRAM_SECURITY_BOT_TOKEN` و`TELEGRAM_SECURITY_CHAT_ID` | روبوت مخصص للتنبيهات ومعرّف قناة أو محادثة التنبيهات. |
+
+يرسل `security-ci-alert.yml` رسالة خارجية فقط بعد تأكيد فشل خطوة **Run Firestore Security Rules tests**. تقتصر الرسالة على رقم التشغيل والفرع والـSHA ورابط التشغيل، وتتخطى GitHub الخطوة تلقائيًا إن غاب السر المطلوب. لا تُطبع قيمة السر أو الحمولة أو رابط Telegram في السجل؛ فإذا ظهر رابط Slack أو رمز Telegram في التزام أو سجل أو لقطة شاشة، ألغِه وأنشئ قيمة بديلة فورًا ثم حدّث GitHub Secret.
+
 ## تفعيل مسار التحقق
 
 أُعد رابط `origin` محليًا للمستودع، لكن لم يُرفع فرع `main` بنجاح بعد. بعد رفع الفرع مرة واحدة، سيظهر سير عمل **Flutter Web CI** في تبويب **Actions**. يمكن تشغيل فحوصات CI يدويًا من زر **Run workflow**، أما النشر فيحدث فقط مع دفع جديد إلى `main`.
@@ -89,3 +100,6 @@ https://redaa4u774201299-crypto.github.io/-ys-job-flutter./
 [5]: https://firebase.google.com/docs/rules/unit-tests "Firebase: Build unit tests for Security Rules"
 [6]: https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#workflow_run "GitHub Docs — workflow_run event"
 [7]: https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#permissions "GitHub Docs — Workflow permissions"
+[8]: https://docs.github.com/actions/security-guides/using-secrets-in-github-actions "GitHub Docs — Using secrets in GitHub Actions"
+[9]: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks "Slack Docs — Incoming Webhooks"
+[10]: https://core.telegram.org/bots/api#sendmessage "Telegram Bot API — sendMessage"

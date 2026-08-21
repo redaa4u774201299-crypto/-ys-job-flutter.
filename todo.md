@@ -130,3 +130,5 @@
 - [x] دمج اختبارات قواعد Firestore عبر Firebase Emulator ضمن GitHub Actions قبل بناء Flutter Web والنشر إلى Pages.
 - [x] إضافة مراقبة لفشل اختبارات قواعد Firestore في GitHub Actions مع إشعار آمن لا يعتمد على بيانات اعتماد الإنتاج.
 - [x] إنشاء مهارة قابلة لإعادة الاستخدام لإعداد قواعد Firestore واختبارات Emulator ومراقبة فشل CI.
+- [x] إضافة تنبيه Webhook خارجي اختياري وآمن لفشل بوابة قواعد Firestore في GitHub Actions.
+- [x] توسيع مهارة Flutter Firestore Security CI بنمط Slack وTelegram القائم على GitHub Secrets.
