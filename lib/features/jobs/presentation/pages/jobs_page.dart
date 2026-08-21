@@ -47,6 +47,13 @@ class _JobsPageState extends ConsumerState<JobsPage> {
 
   void _refresh() => setState(() {});
 
+  void _clearFilters() {
+    FocusScope.of(context).unfocus();
+    _queryController.clear();
+    _locationController.clear();
+    setState(() => _jobType = '');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!ref.watch(firebaseRuntimeProvider).isReady) {
@@ -129,11 +136,17 @@ class _JobsPageState extends ConsumerState<JobsPage> {
                               ),
                               const SizedBox(width: 22),
                               Expanded(
-                                child: _PaginatedJobsList(filters: _filters),
+                                child: _PaginatedJobsList(
+                                  filters: _filters,
+                                  onClearFilters: _clearFilters,
+                                ),
                               ),
                             ],
                           )
-                        : _PaginatedJobsList(filters: _filters),
+                        : _PaginatedJobsList(
+                            filters: _filters,
+                            onClearFilters: _clearFilters,
+                          ),
                   ),
                 ],
               ),
@@ -248,8 +261,12 @@ class _FiltersPanel extends StatelessWidget {
 }
 
 class _PaginatedJobsList extends ConsumerStatefulWidget {
-  const _PaginatedJobsList({required this.filters});
+  const _PaginatedJobsList({
+    required this.filters,
+    required this.onClearFilters,
+  });
   final JobFilters filters;
+  final VoidCallback onClearFilters;
 
   @override
   ConsumerState<_PaginatedJobsList> createState() => _PaginatedJobsListState();
@@ -293,8 +310,16 @@ class _PaginatedJobsListState extends ConsumerState<_PaginatedJobsList> {
     final jobsState = ref.watch(paginatedJobsProvider(widget.filters));
     final controller = ref.read(paginatedJobsProvider(widget.filters).notifier);
 
-    if (jobsState.isLoadingInitial) {
-      return const Center(child: CircularProgressIndicator());
+    final bool isLoading = jobsState.isLoading;
+    if (isLoading) {
+      return Center(
+        child: Semantics(
+          label: 'جارٍ تحميل الوظائف',
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      );
     }
     if (jobsState.error != null && jobsState.jobs.isEmpty) {
       return Center(
@@ -305,9 +330,7 @@ class _PaginatedJobsListState extends ConsumerState<_PaginatedJobsList> {
       );
     }
     if (jobsState.jobs.isEmpty) {
-      return const Center(
-        child: Text('لا توجد وظائف تطابق معايير البحث الحالية.'),
-      );
+      return _EmptySearchResults(onClearFilters: widget.onClearFilters);
     }
 
     final footerCount = jobsState.isLoadingMore || jobsState.error != null
@@ -320,9 +343,13 @@ class _PaginatedJobsListState extends ConsumerState<_PaginatedJobsList> {
       itemBuilder: (context, index) {
         if (index == jobsState.jobs.length) {
           if (jobsState.isLoadingMore) {
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
             );
           }
           return Center(
@@ -338,6 +365,48 @@ class _PaginatedJobsListState extends ConsumerState<_PaginatedJobsList> {
           onTap: () => context.go(AppRoutes.jobDetails(job.id)),
         );
       },
+    );
+  }
+}
+
+class _EmptySearchResults extends StatelessWidget {
+  const _EmptySearchResults({required this.onClearFilters});
+
+  final VoidCallback onClearFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.manage_search_outlined,
+                size: 68,
+                color: colors.primary,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'لم يتم العثور على وظائف تطابق بحثك حالياً',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: onClearFilters,
+                icon: const Icon(Icons.clear_all_outlined),
+                label: const Text('مسح الفلاتر'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

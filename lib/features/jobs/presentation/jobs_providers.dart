@@ -21,6 +21,10 @@ class PaginatedJobsState {
   final bool hasMore;
   final Object? error;
 
+  /// حالة تحميل الدفعة الأولى التي تقود واجهة نتائج البحث.
+  /// تبقى منفصلة عن [isLoadingMore] حتى لا تُخفي النتائج أثناء التمرير.
+  bool get isLoading => isLoadingInitial;
+
   PaginatedJobsState copyWith({
     List<JobModel>? jobs,
     DocumentSnapshot<Map<String, dynamic>>? lastDocument,

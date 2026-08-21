@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ys_job/features/jobs/data/jobs_repository.dart';
+import 'package:ys_job/features/jobs/presentation/jobs_providers.dart';
 import 'package:ys_job/shared/models/job_model.dart';
 import 'package:ys_job/shared/search/job_search_index.dart';
 
@@ -77,6 +78,14 @@ void main() {
 
       expect(fullPage.hasMore, isTrue);
       expect(partialPage.hasMore, isFalse);
+    });
+
+    test('يكشف حالة تحميل الدفعة الأولى عبر متغير منطقي واضح', () {
+      const loadingState = PaginatedJobsState();
+      const loadedState = PaginatedJobsState(isLoadingInitial: false);
+
+      expect(loadingState.isLoading, isTrue);
+      expect(loadedState.isLoading, isFalse);
     });
   });
 }
