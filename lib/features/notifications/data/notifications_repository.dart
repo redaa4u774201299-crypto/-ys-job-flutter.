@@ -87,6 +87,32 @@ class NotificationsRepository {
     return notification;
   }
 
+  /// ينشئ تنبيهًا لصاحب الوظيفة ضمن معاملة إنشاء الطلب نفسه.
+  ///
+  /// استخدام [Transaction] يبقي ظهور الطلب والإشعار متّسقًا: إما أن يثبتا
+  /// معًا أو يُلغيا معًا. لا يتضمن التنبيه أي بيانات اتصال أو سيرة ذاتية.
+  NotificationModel createEmployerNewApplicationNotification({
+    required Transaction transaction,
+    required ApplicationModel application,
+    required String jobTitle,
+  }) {
+    final document = _firestore.collection('notifications').doc();
+    final notification = NotificationModel(
+      id: document.id,
+      userId: application.employerId,
+      title: 'طلب تقديم جديد',
+      message: 'تلقى إعلان «$jobTitle» طلب تقديم جديدًا.',
+      isRead: false,
+      createdAt: DateTime.now().toUtc(),
+      applicationId: application.id,
+    );
+    transaction.set(document, {
+      ...notification.toFirestore(),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return notification;
+  }
+
   User _requireUser() {
     final user = _auth.currentUser;
     if (user == null)

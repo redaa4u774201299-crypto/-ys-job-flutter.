@@ -68,6 +68,7 @@ class ApplicationsRepository {
       if (employerId.isEmpty) {
         throw StateError('تعذر التحقق من صاحب الوظيفة.');
       }
+      final jobTitle = jobSnapshot.data()?['title']?.toString().trim() ?? '';
       final application = ApplicationModel(
         id: id,
         jobId: job.id,
@@ -80,6 +81,11 @@ class ApplicationsRepository {
         ...application.toFirestore(),
         'appliedAt': FieldValue.serverTimestamp(),
       });
+      _notifications.createEmployerNewApplicationNotification(
+        transaction: transaction,
+        application: application,
+        jobTitle: jobTitle.isEmpty ? 'هذه الوظيفة' : jobTitle,
+      );
     });
   });
 

@@ -6,6 +6,7 @@ import '../../../core/router/app_routes.dart';
 import '../../auth/data/auth_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/user_model.dart';
+import '../../notifications/data/notifications_repository.dart';
 
 class EmployerLayout extends ConsumerWidget {
   const EmployerLayout({super.key, required this.child});
@@ -46,6 +47,7 @@ class EmployerLayout extends ConsumerWidget {
           ],
         ),
         actions: [
+          const _EmployerNotificationsButton(),
           IconButton(
             tooltip: 'تسجيل الخروج',
             onPressed: () async {
@@ -59,6 +61,80 @@ class EmployerLayout extends ConsumerWidget {
       ),
       drawer: _EmployerDrawer(companyName: companyName, profile: profile),
       body: child,
+    );
+  }
+}
+
+class _EmployerNotificationsButton extends ConsumerWidget {
+  const _EmployerNotificationsButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repository = ref.watch(notificationsRepositoryProvider);
+    return StreamBuilder<int>(
+      stream: repository.watchUnreadCount(),
+      builder: (context, snapshot) {
+        final unreadCount = snapshot.data ?? 0;
+        return IconButton(
+          tooltip: unreadCount == 0
+              ? 'الإشعارات'
+              : 'لديك $unreadCount إشعارًا غير مقروء',
+          onPressed: () => _showNotifications(context, repository),
+          icon: Badge(
+            isLabelVisible: unreadCount > 0,
+            label: Text(unreadCount > 9 ? '9+' : '$unreadCount'),
+            child: const Icon(Icons.notifications_outlined),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showNotifications(
+    BuildContext context,
+    NotificationsRepository repository,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: StreamBuilder(
+          stream: repository.watchCurrentUserNotifications(limit: 20),
+          builder: (context, snapshot) {
+            final notifications = snapshot.data ?? const [];
+            if (notifications.isEmpty) {
+              return const SizedBox(
+                height: 180,
+                child: Center(child: Text('لا توجد إشعارات جديدة حاليًا.')),
+              );
+            }
+            return ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+              itemCount: notifications.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final notification = notifications[index];
+                return ListTile(
+                  leading: Icon(
+                    notification.isRead
+                        ? Icons.notifications_none
+                        : Icons.notifications_active_outlined,
+                  ),
+                  title: Text(notification.title),
+                  subtitle: Text(notification.message),
+                  onTap: () async {
+                    await repository.markAsRead(notification);
+                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                    if (context.mounted)
+                      context.go(AppRoutes.employerDashboard);
+                  },
+                );
+              },
+            );
+          },
+        ),
+      ),
     );
   }
 }

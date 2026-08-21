@@ -190,7 +190,8 @@ service cloud.firestore {
         (signedIn() && resource.data.userId == request.auth.uid);
 
       // يُسمح لصاحب الشركة بإنشاء إشعار واحد مرتبط بتحديث حالة طلب يخص وظيفته
-      // ضمن نفس batch؛ يمنع ذلك إنشاء إشعارات عشوائية لمستخدمين آخرين.
+      // ضمن نفس batch، أو للباحث بإنشاء تنبيه للناشر في معاملة إنشاء طلبه.
+      // يمنع ذلك إنشاء إشعارات عشوائية لمستخدمين آخرين.
       allow create: if isAdmin() ||
         (
           isEmployer() &&
@@ -202,6 +203,25 @@ service cloud.firestore {
             applicationAfter(request.resource.data.applicationId).data.seekerId &&
           applicationAfter(request.resource.data.applicationId).data.status !=
             application(request.resource.data.applicationId).data.status
+        ) || (
+          isActiveUser() &&
+          currentProfile().data.role == 'seeker' &&
+          request.resource.data.keys().hasOnly([
+            'id', 'userId', 'title', 'message', 'isRead', 'createdAt',
+            'applicationId'
+          ]) &&
+          request.resource.data.id == notificationId &&
+          request.resource.data.isRead == false &&
+          request.resource.data.createdAt is timestamp &&
+          !exists(/databases/$(database)/documents/applications/$(request.resource.data.applicationId)) &&
+          applicationAfter(request.resource.data.applicationId).data.seekerId ==
+            request.auth.uid &&
+          applicationAfter(request.resource.data.applicationId).data.applicantId ==
+            request.auth.uid &&
+          applicationAfter(request.resource.data.applicationId).data.employerId ==
+            request.resource.data.userId &&
+          applicationAfter(request.resource.data.applicationId).data.status ==
+            'pending'
         );
 
       // مستقبل الإشعار يمكنه تغيير isRead فقط؛ بقية الحقول ثابتة.

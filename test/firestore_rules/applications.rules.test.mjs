@@ -5,7 +5,12 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import {
+  doc,
+  serverTimestamp,
+  setDoc,
+  writeBatch,
+} from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
 // تستخدم مجموعة مستقلة كي لا تتداخل clearFirestore في هذا الملف مع اختبارات
@@ -48,6 +53,19 @@ function applicationPayload(overrides = {}) {
     employerId,
     status: 'pending',
     appliedAt: serverTimestamp(),
+    ...overrides,
+  };
+}
+
+function employerNotificationPayload(overrides = {}) {
+  return {
+    id: 'notification-application-1',
+    userId: employerId,
+    title: 'طلب تقديم جديد',
+    message: 'تلقى إعلان طلب تقديم جديدًا.',
+    isRead: false,
+    createdAt: serverTimestamp(),
+    applicationId,
     ...overrides,
   };
 }
@@ -97,5 +115,40 @@ describe('Firestore application creation rules', () => {
 
     await assertSucceeds(setDoc(reference, applicationPayload()));
     await assertFails(setDoc(reference, applicationPayload()));
+  });
+
+  it('يسمح بإنشاء الطلب وتنبيه الناشر معًا في معاملة واحدة', async () => {
+    const seeker = testEnvironment.authenticatedContext(seekerId).firestore();
+    const batch = writeBatch(seeker);
+    batch.set(doc(seeker, 'applications', applicationId), applicationPayload());
+    batch.set(
+      doc(seeker, 'notifications', 'notification-application-1'),
+      employerNotificationPayload(),
+    );
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('يرفض إنشاء تنبيه ناشر منفردًا دون إنشاء طلب جديد في المعاملة نفسها', async () => {
+    const seeker = testEnvironment.authenticatedContext(seekerId).firestore();
+
+    await assertFails(
+      setDoc(
+        doc(seeker, 'notifications', 'notification-application-1'),
+        employerNotificationPayload(),
+      ),
+    );
+  });
+
+  it('يرفض تنبيه الطلب الجديد إذا وُجّه إلى مستخدم غير ناشر الوظيفة', async () => {
+    const seeker = testEnvironment.authenticatedContext(seekerId).firestore();
+    const batch = writeBatch(seeker);
+    batch.set(doc(seeker, 'applications', applicationId), applicationPayload());
+    batch.set(
+      doc(seeker, 'notifications', 'notification-application-1'),
+      employerNotificationPayload({ userId: 'another-employer' }),
+    );
+
+    await assertFails(batch.commit());
   });
 });
