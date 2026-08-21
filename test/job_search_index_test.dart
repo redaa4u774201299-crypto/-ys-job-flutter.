@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ys_job/features/jobs/data/jobs_repository.dart';
 import 'package:ys_job/shared/models/job_model.dart';
 import 'package:ys_job/shared/search/job_search_index.dart';
 
@@ -38,10 +39,44 @@ void main() {
       final terms = data['searchTerms']! as List<String>;
 
       expect(data['locationKey'], 'صنعاء');
+      expect(data['createdAt'], isNotNull);
       expect(terms, contains('مح'));
       expect(terms, contains('شر'));
       expect(terms, isNot(contains('خ')));
       expect(terms, isNot(contains('7')));
+    });
+
+    test('يحدد عقد الصفحة وجود دفعة تالية عند اكتمال حد 20 وظيفة', () {
+      final jobs = List<JobModel>.generate(
+        JobsRepository.searchPageSize,
+        (index) => JobModel(
+          id: 'job-$index',
+          employerId: 'employer-1',
+          employerName: 'شركة الريادة',
+          title: 'محاسب $index',
+          description: '',
+          requirements: '',
+          jobType: 'دوام كامل',
+          salaryRange: 'غير محدد',
+          location: 'صنعاء',
+          isFeatured: false,
+          postedAt: DateTime.utc(2026),
+        ),
+      );
+
+      final fullPage = JobsSearchPage(
+        jobs: jobs,
+        lastDocument: null,
+        hasMore: jobs.length == JobsRepository.searchPageSize,
+      );
+      final partialPage = JobsSearchPage(
+        jobs: jobs.take(3).toList(growable: false),
+        lastDocument: null,
+        hasMore: false,
+      );
+
+      expect(fullPage.hasMore, isTrue);
+      expect(partialPage.hasMore, isFalse);
     });
   });
 }

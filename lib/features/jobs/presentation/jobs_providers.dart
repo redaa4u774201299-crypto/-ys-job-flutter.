@@ -1,13 +1,111 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/jobs_repository.dart';
 import '../../../shared/models/job_model.dart';
 
-/// يبقي تدفقات Firestore الخاصة بواجهة الباحث قابلة لإعادة الاستخدام
-/// ومتصلة تلقائيًا بالفلاتر النشطة من دون تخزين بيانات مكررة محليًا.
-final availableJobsProvider = StreamProvider.autoDispose
-    .family<List<JobModel>, JobFilters>((ref, filters) {
-      return ref.watch(jobsRepositoryProvider).watchAvailableJobs(filters);
+class PaginatedJobsState {
+  const PaginatedJobsState({
+    this.jobs = const [],
+    this.lastDocument,
+    this.isLoadingInitial = true,
+    this.isLoadingMore = false,
+    this.hasMore = true,
+    this.error,
+  });
+
+  final List<JobModel> jobs;
+  final DocumentSnapshot<Map<String, dynamic>>? lastDocument;
+  final bool isLoadingInitial;
+  final bool isLoadingMore;
+  final bool hasMore;
+  final Object? error;
+
+  PaginatedJobsState copyWith({
+    List<JobModel>? jobs,
+    DocumentSnapshot<Map<String, dynamic>>? lastDocument,
+    bool? isLoadingInitial,
+    bool? isLoadingMore,
+    bool? hasMore,
+    Object? error,
+  }) => PaginatedJobsState(
+    jobs: jobs ?? this.jobs,
+    lastDocument: lastDocument ?? this.lastDocument,
+    isLoadingInitial: isLoadingInitial ?? this.isLoadingInitial,
+    isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    hasMore: hasMore ?? this.hasMore,
+    error: error,
+  );
+}
+
+class JobsPaginationController extends StateNotifier<PaginatedJobsState> {
+  JobsPaginationController(this._repository, this._filters)
+    : super(const PaginatedJobsState()) {
+    loadInitial();
+  }
+
+  final JobsRepository _repository;
+  final JobFilters _filters;
+
+  Future<void> loadInitial() async {
+    state = const PaginatedJobsState();
+    try {
+      final page = await _repository.searchJobs(_filters);
+      state = PaginatedJobsState(
+        jobs: page.jobs,
+        lastDocument: page.lastDocument,
+        isLoadingInitial: false,
+        hasMore: page.hasMore,
+      );
+    } catch (error) {
+      state = PaginatedJobsState(isLoadingInitial: false, error: error);
+    }
+  }
+
+  Future<void> loadMore() async {
+    final current = state;
+    if (current.isLoadingInitial ||
+        current.isLoadingMore ||
+        !current.hasMore ||
+        current.lastDocument == null) {
+      return;
+    }
+
+    state = current.copyWith(isLoadingMore: true);
+    try {
+      final page = await _repository.searchJobs(
+        _filters,
+        startAfterDocument: current.lastDocument,
+      );
+      state = PaginatedJobsState(
+        jobs: [...current.jobs, ...page.jobs],
+        lastDocument: page.lastDocument ?? current.lastDocument,
+        isLoadingInitial: false,
+        hasMore: page.hasMore,
+      );
+    } catch (error) {
+      state = current.copyWith(isLoadingMore: false, error: error);
+    }
+  }
+}
+
+/// دفعة الصفحة الرئيسية المحدودة؛ تبقى مستقلة عن حالة تمرير صفحة الاستكشاف.
+final availableJobsProvider = FutureProvider.autoDispose
+    .family<List<JobModel>, JobFilters>((ref, filters) async {
+      final page = await ref.watch(jobsRepositoryProvider).searchJobs(filters);
+      return page.jobs;
+    });
+
+/// ينشئ حالة مستقلة لكل مجموعة فلاتر، ويحمل الدفعة التالية فقط عند طلب الواجهة.
+final paginatedJobsProvider = StateNotifierProvider.autoDispose
+    .family<JobsPaginationController, PaginatedJobsState, JobFilters>((
+      ref,
+      filters,
+    ) {
+      return JobsPaginationController(
+        ref.watch(jobsRepositoryProvider),
+        filters,
+      );
     });
 
 final jobDetailsProvider = StreamProvider.autoDispose.family<JobModel?, String>(

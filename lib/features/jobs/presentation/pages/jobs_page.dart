@@ -128,10 +128,12 @@ class _JobsPageState extends ConsumerState<JobsPage> {
                                 ),
                               ),
                               const SizedBox(width: 22),
-                              Expanded(child: _JobsStream(filters: _filters)),
+                              Expanded(
+                                child: _PaginatedJobsList(filters: _filters),
+                              ),
                             ],
                           )
-                        : _JobsStream(filters: _filters),
+                        : _PaginatedJobsList(filters: _filters),
                   ),
                 ],
               ),
@@ -245,34 +247,95 @@ class _FiltersPanel extends StatelessWidget {
   );
 }
 
-class _JobsStream extends ConsumerWidget {
-  const _JobsStream({required this.filters});
+class _PaginatedJobsList extends ConsumerStatefulWidget {
+  const _PaginatedJobsList({required this.filters});
   final JobFilters filters;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final jobsState = ref.watch(availableJobsProvider(filters));
-    return jobsState.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const Center(
-        child: Text('تعذر تحميل الوظائف. تحقق من قواعد Firestore.'),
-      ),
-      data: (jobs) {
-        if (jobs.isEmpty) {
-          return const Center(
-            child: Text('لا توجد وظائف تطابق معايير البحث الحالية.'),
+  ConsumerState<_PaginatedJobsList> createState() => _PaginatedJobsListState();
+}
+
+class _PaginatedJobsListState extends ConsumerState<_PaginatedJobsList> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_loadNextPageIfNeeded);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PaginatedJobsList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filters != widget.filters && _scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_loadNextPageIfNeeded)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _loadNextPageIfNeeded() {
+    if (!_scrollController.hasClients ||
+        _scrollController.position.extentAfter > 360) {
+      return;
+    }
+    ref.read(paginatedJobsProvider(widget.filters).notifier).loadMore();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final jobsState = ref.watch(paginatedJobsProvider(widget.filters));
+    final controller = ref.read(paginatedJobsProvider(widget.filters).notifier);
+
+    if (jobsState.isLoadingInitial) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (jobsState.error != null && jobsState.jobs.isEmpty) {
+      return Center(
+        child: FilledButton.tonal(
+          onPressed: controller.loadInitial,
+          child: const Text('تعذر تحميل الوظائف. حاول مجددًا.'),
+        ),
+      );
+    }
+    if (jobsState.jobs.isEmpty) {
+      return const Center(
+        child: Text('لا توجد وظائف تطابق معايير البحث الحالية.'),
+      );
+    }
+
+    final footerCount = jobsState.isLoadingMore || jobsState.error != null
+        ? 1
+        : 0;
+    return ListView.separated(
+      controller: _scrollController,
+      itemCount: jobsState.jobs.length + footerCount,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        if (index == jobsState.jobs.length) {
+          if (jobsState.isLoadingMore) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return Center(
+            child: TextButton(
+              onPressed: controller.loadMore,
+              child: const Text('تعذر تحميل المزيد. حاول مجددًا.'),
+            ),
           );
         }
-        return ListView.separated(
-          itemCount: jobs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final job = jobs[index];
-            return JobSummaryCard(
-              job: job,
-              onTap: () => context.go(AppRoutes.jobDetails(job.id)),
-            );
-          },
+        final job = jobsState.jobs[index];
+        return JobSummaryCard(
+          job: job,
+          onTap: () => context.go(AppRoutes.jobDetails(job.id)),
         );
       },
     );

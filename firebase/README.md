@@ -10,6 +10,8 @@
 
 للمرجع، يوضح [دليل فهارس Cloud Firestore الرسمي](https://firebase.google.com/docs/firestore/query-data/index-overview) أن الجمع بين مرشحات متعددة يحتاج فهرسًا يدويًا مناسبًا، وأن حقل المصفوفة يدعم `array-contains`. راجع أيضًا [إدارة الفهارس في Firebase](https://firebase.google.com/docs/firestore/query-data/indexing) قبل إنشاء الفهرس في بيئة الإنتاج.
 
+يرتّب البحث العام بالـ `createdAt` تنازليًا ويحد كل دفعة إلى 20 مستندًا. تُمرر الوثيقة الأخيرة من الدفعة إلى `startAfterDocument` في الاستعلام المطابق نفسه للحصول على الدفعة التالية دون تضمين المستند السابق، وفق [توثيق الترتيب والحدود](https://firebase.google.com/docs/firestore/query-data/order-limit-data) و[توثيق مؤشرات الاستئناف](https://firebase.google.com/docs/firestore/query-data/query-cursors) الرسميين.
+
 لا تستخدم إدارة الملف الشخصي الحالية **Firebase Storage**. تُصغّر الصور المختارة إلى حد أقصى 512 بكسل وتُضغط محليًا إلى JPEG بجودة 72 قبل حفظها كنص Base64 في مستند المستخدم داخل Firestore. تحفظ الشركة شعارها في `logoBase64`، ويحفظ الباحث صورته في `imageBase64`، بينما تحفظ السيرة الذاتية كرابط خارجي في `cvUrl`. يبقى [`storage.rules`](./storage.rules) مرجعًا تاريخيًا فقط ولا يلزم نسخه أو نشره لهذه الميزة.
 
 > تعتمد القواعد على مستند مستخدم موجود في `users/{uid}` ويحتوي على `role` و`isActive`. يجب إنشاء أول حساب إداري بطريقة موثوقة من Firebase Console أو بيئة إدارية خاضعة للرقابة، وليس من واجهة التسجيل العامة.

@@ -38,7 +38,23 @@ class JobFilters {
   int get hashCode => Object.hash(query, jobType, location);
 }
 
+/// نتيجة دفعة واحدة من بحث الوظائف. يُحتفظ بآخر مستند فقط في الذاكرة
+/// لاستخدامه كمؤشر استئناف، ولا يُخزن أو يُعرض للمستخدم.
+class JobsSearchPage {
+  const JobsSearchPage({
+    required this.jobs,
+    required this.lastDocument,
+    required this.hasMore,
+  });
+
+  final List<JobModel> jobs;
+  final DocumentSnapshot<Map<String, dynamic>>? lastDocument;
+  final bool hasMore;
+}
+
 class JobsRepository {
+  static const searchPageSize = 20;
+
   JobsRepository(
     this._firestore,
     this._auth, {
@@ -50,13 +66,14 @@ class JobsRepository {
   final FirebaseAuth _auth;
   final AppPerformanceMonitor _performanceMonitor;
 
-  Stream<List<JobModel>> watchAvailableJobs(JobFilters filters) =>
-      searchJobs(filters);
-
   /// يستعلم Firestore باستخدام مفاتيح عامة قابلة للفهرسة، بدل تحميل الوظائف
-  /// ثم البحث داخل الوصف محليًا. تُبقي واجهة المستخدم البحث الفارغ خارج هذا
-  /// المسار، بينما يظل الاستعراض العام متاحًا عندما تكون الفلاتر فارغة.
-  Stream<List<JobModel>> searchJobs(JobFilters filters) {
+  /// ثم البحث داخل الوصف محليًا. يعيد 20 مستندًا كحد أقصى في كل دفعة.
+  /// مرر [startAfterDocument] كما أُعيد في الدفعة السابقة لاستكمال التمرير
+  /// من الموضع نفسه مع ثبات الفلاتر والترتيب.
+  Future<JobsSearchPage> searchJobs(
+    JobFilters filters, {
+    DocumentSnapshot<Map<String, dynamic>>? startAfterDocument,
+  }) {
     final normalizedQuery = JobSearchIndex.normalize(filters.query);
     final normalizedLocation = JobSearchIndex.normalize(filters.location);
     Query<Map<String, dynamic>> query = _firestore
@@ -70,18 +87,29 @@ class JobsRepository {
       query = query.where('searchTerms', arrayContains: normalizedQuery);
     }
 
-    final stream = query.snapshots().map(
-      (snapshot) =>
-          snapshot.docs
-              .map(JobModel.fromFirestore)
-              .where((job) => _matches(job, filters))
-              .toList(growable: false)
-            ..sort((a, b) => b.postedAt.compareTo(a.postedAt)),
-    );
-    return _performanceMonitor.measureFirstStream(
+    query = query.orderBy('createdAt', descending: true).limit(searchPageSize);
+    if (startAfterDocument != null) {
+      query = query.startAfterDocument(startAfterDocument);
+    }
+
+    Future<JobsSearchPage> fetchPage() async {
+      final snapshot = await query.get();
+      final jobs = snapshot.docs
+          .map(JobModel.fromFirestore)
+          .where((job) => _matches(job, filters))
+          .toList(growable: false);
+      return JobsSearchPage(
+        jobs: jobs,
+        lastDocument: snapshot.docs.isEmpty ? null : snapshot.docs.last,
+        hasMore: snapshot.docs.length == searchPageSize,
+      );
+    }
+
+    if (startAfterDocument != null) return fetchPage();
+    return _performanceMonitor.measure(
       'jobs_initial_load',
-      stream,
-      resultCount: (jobs) => jobs.length,
+      fetchPage,
+      resultCount: (page) => page.jobs.length,
     );
   }
 
@@ -137,6 +165,7 @@ class JobsRepository {
     await document.set({
       ...job.toFirestore(),
       'postedAt': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
     });
   }
 

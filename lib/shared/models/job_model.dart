@@ -96,6 +96,7 @@ class JobModel {
     'salaryRange': salaryRange,
     'isFeatured': isFeatured,
     'postedAt': postedAt.toUtc().toIso8601String(),
+    'createdAt': postedAt.toUtc().toIso8601String(),
     'requirements': requirements,
     'status': status.value,
     'employerName': employerName,
@@ -112,6 +113,7 @@ class JobModel {
     salaryRange: _asText(json['salaryRange']),
     isFeatured: json['isFeatured'] == true,
     postedAt:
+        _asDate(json['createdAt']) ??
         _asDate(json['postedAt']) ??
         DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
     requirements: _asText(json['requirements']),
@@ -130,6 +132,9 @@ class JobModel {
     'salaryRange': salaryRange,
     'isFeatured': isFeatured,
     'postedAt': Timestamp.fromDate(postedAt.toUtc()),
+    // مرجع الترتيب في الاستعلامات العامة المقسمة؛ يظل postedAt موجودًا
+    // لتوافق الوظائف المنشورة قبل اعتماد هذا الحقل.
+    'createdAt': Timestamp.fromDate(postedAt.toUtc()),
     'requirements': requirements,
     'status': status.value,
     'employerName': employerName,
