@@ -127,16 +127,16 @@ class _SeekerDashboard extends ConsumerWidget {
                         ),
                       ),
                       OutlinedButton.icon(
-                        onPressed: () => context.go(AppRoutes.jobs),
+                        onPressed: () => context.go(AppRoutes.seekerSearch),
                         icon: const Icon(Icons.search_outlined),
-                        label: const Text('استكشاف الوظائف'),
+                        label: const Text('استعراض الوظائف'),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   if (records.isEmpty)
                     _SeekerApplicationsEmptyState(
-                      onExplore: () => context.go(AppRoutes.jobs),
+                      onExplore: () => context.go(AppRoutes.seekerSearch),
                     )
                   else
                     ...records.map(
@@ -173,7 +173,7 @@ class _SeekerApplicationsEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'لم تقدّم على أي وظيفة بعد',
+            'لم تتقدم على أي وظيفة بعد',
             style: Theme.of(context).textTheme.titleMedium
                 ?.copyWith(fontWeight: FontWeight.w800),
           ),
@@ -186,7 +186,7 @@ class _SeekerApplicationsEmptyState extends StatelessWidget {
           FilledButton.icon(
             onPressed: onExplore,
             icon: const Icon(Icons.search_outlined),
-            label: const Text('استكشاف الوظائف'),
+            label: const Text('استعراض الوظائف'),
           ),
         ],
       ),

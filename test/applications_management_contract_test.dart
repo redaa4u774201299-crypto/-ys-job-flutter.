@@ -32,6 +32,10 @@ void main() {
     test('يثبت مسار لوحة الباحث المستقل', () {
       expect(AppRoutes.seekerDashboard, '/seeker-dashboard');
     });
+
+    test('يوجه استعراض الوظائف من طلبات الباحث إلى صفحة البحث المحمية', () {
+      expect(AppRoutes.seekerSearch, '/seeker-dashboard/search');
+    });
   });
 
   test('تحسب لوحة الباحث حالات الطلبات من بيانات فعلية', () {
