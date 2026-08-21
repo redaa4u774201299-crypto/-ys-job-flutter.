@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase/firebase_runtime.dart';
+import '../../../core/monitoring/app_performance_monitor.dart';
 import '../../../shared/models/job_model.dart';
 
 final jobsRepositoryProvider = Provider<JobsRepository>((ref) {
@@ -10,7 +11,11 @@ final jobsRepositoryProvider = Provider<JobsRepository>((ref) {
   if (!runtime.isReady) {
     throw StateError('Firebase غير مهيأ لهذا المشروع.');
   }
-  return JobsRepository(FirebaseFirestore.instance, FirebaseAuth.instance);
+  return JobsRepository(
+    FirebaseFirestore.instance,
+    FirebaseAuth.instance,
+    performanceMonitor: ref.watch(appPerformanceMonitorProvider),
+  );
 });
 
 class JobFilters {
@@ -33,23 +38,36 @@ class JobFilters {
 }
 
 class JobsRepository {
-  JobsRepository(this._firestore, this._auth);
+  JobsRepository(
+    this._firestore,
+    this._auth, {
+    AppPerformanceMonitor? performanceMonitor,
+  }) : _performanceMonitor =
+           performanceMonitor ?? const NoopAppPerformanceMonitor();
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+  final AppPerformanceMonitor _performanceMonitor;
 
-  Stream<List<JobModel>> watchAvailableJobs(JobFilters filters) => _firestore
-      .collection('jobs')
-      .where('status', isEqualTo: JobStatus.active.value)
-      .snapshots()
-      .map(
-        (snapshot) =>
-            snapshot.docs
-                .map(JobModel.fromFirestore)
-                .where((job) => _matches(job, filters))
-                .toList(growable: false)
-              ..sort((a, b) => b.postedAt.compareTo(a.postedAt)),
-      );
+  Stream<List<JobModel>> watchAvailableJobs(JobFilters filters) {
+    final stream = _firestore
+        .collection('jobs')
+        .where('status', isEqualTo: JobStatus.active.value)
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs
+                  .map(JobModel.fromFirestore)
+                  .where((job) => _matches(job, filters))
+                  .toList(growable: false)
+                ..sort((a, b) => b.postedAt.compareTo(a.postedAt)),
+        );
+    return _performanceMonitor.measureFirstStream(
+      'jobs_initial_load',
+      stream,
+      resultCount: (jobs) => jobs.length,
+    );
+  }
 
   Stream<List<JobModel>> watchEmployerJobs(String employerId) => _firestore
       .collection('jobs')

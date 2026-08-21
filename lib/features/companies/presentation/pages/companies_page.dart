@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/firebase/firebase_runtime.dart';
+import '../../../../core/monitoring/app_performance_monitor.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/company_directory_entry.dart';
 import '../../../../shared/widgets/base64_thumbnail_avatar.dart';
@@ -13,7 +14,7 @@ final companiesDirectoryProvider =
       final runtime = ref.watch(firebaseRuntimeProvider);
       if (!runtime.isReady)
         return Stream.value(const <CompanyDirectoryEntry>[]);
-      return FirebaseFirestore.instance
+      final stream = FirebaseFirestore.instance
           .collection('company_directory')
           .snapshots()
           .map(
@@ -25,6 +26,13 @@ final companiesDirectoryProvider =
                     (first, second) =>
                         _companyLabel(first).compareTo(_companyLabel(second)),
                   ),
+          );
+      return ref
+          .watch(appPerformanceMonitorProvider)
+          .measureFirstStream(
+            'company_directory_load',
+            stream,
+            resultCount: (companies) => companies.length,
           );
     });
 

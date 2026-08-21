@@ -3,11 +3,15 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/monitoring/app_performance_monitor.dart';
 import '../data/profile_repository.dart';
 
 final profileControllerProvider =
     StateNotifierProvider.autoDispose<ProfileController, ProfileActionState>(
-      (ref) => ProfileController(ref.watch(profileRepositoryProvider)),
+      (ref) => ProfileController(
+        ref.watch(profileRepositoryProvider),
+        performanceMonitor: ref.watch(appPerformanceMonitorProvider),
+      ),
     );
 
 enum ProfileSyncState { idle, saving, synced, pending, retrying, failed }
@@ -45,9 +49,15 @@ class ProfileActionState {
 }
 
 class ProfileController extends StateNotifier<ProfileActionState> {
-  ProfileController(this._repository) : super(const ProfileActionState());
+  ProfileController(
+    this._repository, {
+    AppPerformanceMonitor? performanceMonitor,
+  }) : _performanceMonitor =
+           performanceMonitor ?? const NoopAppPerformanceMonitor(),
+       super(const ProfileActionState());
 
   final ProfileRepository _repository;
+  final AppPerformanceMonitor _performanceMonitor;
   Future<ProfileSyncOutcome> Function()? _retryOperation;
 
   Future<void> saveSeekerProfile({
@@ -131,7 +141,11 @@ class ProfileController extends StateNotifier<ProfileActionState> {
       syncMessage: '',
     );
     try {
-      _applySyncOutcome(await operation());
+      final outcome = await _performanceMonitor.measure(
+        'profile_save',
+        operation,
+      );
+      _applySyncOutcome(outcome);
     } catch (error) {
       _recordSyncFailure(error);
       rethrow;

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase/firebase_runtime.dart';
+import '../../../core/monitoring/app_performance_monitor.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../shared/models/user_model.dart';
 
@@ -27,6 +28,7 @@ final authServiceProvider = Provider<AuthService>(
   (ref) => AuthService(
     ref.watch(firebaseAuthProvider),
     ref.watch(firebaseFirestoreProvider),
+    performanceMonitor: ref.watch(appPerformanceMonitorProvider),
   ),
 );
 
@@ -39,10 +41,16 @@ final userProfileProvider = StreamProvider.family<UserModel?, String>(
 );
 
 class AuthService {
-  AuthService(this._auth, this._firestore);
+  AuthService(
+    this._auth,
+    this._firestore, {
+    AppPerformanceMonitor? performanceMonitor,
+  }) : _performanceMonitor =
+           performanceMonitor ?? const NoopAppPerformanceMonitor();
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final AppPerformanceMonitor _performanceMonitor;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
@@ -65,11 +73,13 @@ class AuthService {
     required String password,
   }) async {
     _validateCredentials(email: email, password: password);
-    final credential = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
-    return _loadSession(credential.user);
+    return _performanceMonitor.measure('auth_sign_in', () async {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      return _loadSession(credential.user);
+    });
   }
 
   Future<AuthSession> registerUser({
@@ -120,8 +130,10 @@ class AuthService {
     if (!kIsWeb) {
       throw UnsupportedError('تسجيل Google المدمج في هذه المرحلة مخصص للويب.');
     }
-    final credential = await _auth.signInWithPopup(GoogleAuthProvider());
-    return _loadSession(credential.user);
+    return _performanceMonitor.measure('auth_sign_in', () async {
+      final credential = await _auth.signInWithPopup(GoogleAuthProvider());
+      return _loadSession(credential.user);
+    });
   }
 
   Future<void> signOut() => _auth.signOut();
