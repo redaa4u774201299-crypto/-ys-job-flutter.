@@ -10,6 +10,7 @@ import '../../../../features/jobs/presentation/widgets/firebase_setup_state.dart
 import '../../../../shared/models/job_model.dart';
 import '../../../../shared/models/user_model.dart';
 import '../../../../shared/responsive/responsive_builder.dart';
+import '../../../../shared/widgets/base64_thumbnail_avatar.dart';
 import '../../data/applications_repository.dart';
 
 class JobDetailsPage extends ConsumerWidget {
@@ -22,7 +23,10 @@ class JobDetailsPage extends ConsumerWidget {
     final jobState = ref.watch(jobDetailsProvider(jobId));
     return jobState.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const _DetailsNotice('تعذر تحميل تفاصيل الوظيفة.'),
+      error: (_, __) => _DetailsNotice(
+        'تعذر تحميل تفاصيل الوظيفة.',
+        onRetry: () => ref.invalidate(jobDetailsProvider(jobId)),
+      ),
       data: (job) {
         if (job == null || !job.isActive) {
           return const _DetailsNotice('هذه الوظيفة غير متاحة حاليًا.');
@@ -75,15 +79,39 @@ class _DetailsBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            job.title,
-            style: Theme.of(context).textTheme.headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w900, color: AppColors.navy),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            job.employerName,
-            style: Theme.of(context).textTheme.titleMedium,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Base64ThumbnailAvatar(
+                encoded: job.employerLogoThumbBase64,
+                fallbackLabel: job.employerName,
+                radius: 31,
+                fallbackIcon: Icons.business_outlined,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      job.title,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.navy,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      job.employerName.isEmpty
+                          ? 'جهة العمل غير محددة'
+                          : job.employerName,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const Divider(height: 36),
           Text(
@@ -128,12 +156,22 @@ class _JobSidebar extends ConsumerWidget {
           _MetaRow(icon: Icons.location_on_outlined, value: job.location),
           _MetaRow(icon: Icons.timer_outlined, value: job.jobType),
           _MetaRow(icon: Icons.payments_outlined, value: job.salaryRange),
+          _MetaRow(
+            icon: Icons.calendar_today_outlined,
+            value: 'نُشرت في ${_formatPostedAt(job.postedAt)}',
+          ),
           const SizedBox(height: 20),
           _ApplyButton(job: job),
         ],
       ),
     ),
   );
+
+  String _formatPostedAt(DateTime postedAt) {
+    final day = postedAt.day.toString().padLeft(2, '0');
+    final month = postedAt.month.toString().padLeft(2, '0');
+    return '$day/$month/${postedAt.year}';
+  }
 }
 
 class _ApplyButton extends ConsumerWidget {
@@ -210,7 +248,7 @@ class _ApplyButton extends ConsumerWidget {
                               );
                           }
                         },
-                  child: Text(applied ? 'تم التقديم' : 'قدم الآن'),
+                  child: Text(applied ? 'تم التقديم' : 'تقديم الآن'),
                 );
               },
             );
@@ -239,10 +277,27 @@ class _MetaRow extends StatelessWidget {
 }
 
 class _DetailsNotice extends StatelessWidget {
-  const _DetailsNotice(this.message);
+  const _DetailsNotice(this.message, {this.onRetry});
   final String message;
+  final VoidCallback? onRetry;
   @override
   Widget build(BuildContext context) => Center(
-    child: Padding(padding: const EdgeInsets.all(24), child: Text(message)),
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(message, textAlign: TextAlign.center),
+          if (onRetry != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ],
+      ),
+    ),
   );
 }

@@ -112,8 +112,15 @@ final paginatedJobsProvider = StateNotifierProvider.autoDispose
       );
     });
 
-final jobDetailsProvider = StreamProvider.autoDispose.family<JobModel?, String>(
+/// يفضّل نتيجة موجودة أصلًا في ذاكرة جلسة التطبيق، ثم يقرأ Firestore عند
+/// فتح رابط مباشر أو إعادة تحميل صفحة الويب. بذلك لا تتضاعف قراءة المستند
+/// لمجرد الانتقال من بطاقة وظيفة إلى تفاصيلها.
+final jobDetailsProvider = FutureProvider.autoDispose.family<JobModel?, String>(
   (ref, jobId) {
-    return ref.watch(jobsRepositoryProvider).watchJob(jobId);
+    final repository = ref.watch(jobsRepositoryProvider);
+    final cachedJob = repository.findCachedJob(jobId);
+    return cachedJob == null
+        ? repository.getJob(jobId)
+        : Future<JobModel?>.value(cachedJob);
   },
 );

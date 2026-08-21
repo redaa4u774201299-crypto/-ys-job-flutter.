@@ -6,6 +6,7 @@ import '../../../core/firebase/firebase_runtime.dart';
 import '../../../core/monitoring/app_performance_monitor.dart';
 import '../../../shared/models/job_model.dart';
 import '../../../shared/search/job_search_index.dart';
+import 'job_details_cache.dart';
 
 final jobsRepositoryProvider = Provider<JobsRepository>((ref) {
   final runtime = ref.watch(firebaseRuntimeProvider);
@@ -59,12 +60,15 @@ class JobsRepository {
     this._firestore,
     this._auth, {
     AppPerformanceMonitor? performanceMonitor,
+    JobDetailsCache? detailsCache,
   }) : _performanceMonitor =
-           performanceMonitor ?? const NoopAppPerformanceMonitor();
+           performanceMonitor ?? const NoopAppPerformanceMonitor(),
+       _detailsCache = detailsCache ?? JobDetailsCache();
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   final AppPerformanceMonitor _performanceMonitor;
+  final JobDetailsCache _detailsCache;
 
   /// يستعلم Firestore باستخدام مفاتيح عامة قابلة للفهرسة، بدل تحميل الوظائف
   /// ثم البحث داخل الوصف محليًا. يعيد 20 مستندًا كحد أقصى في كل دفعة.
@@ -98,6 +102,7 @@ class JobsRepository {
           .map(JobModel.fromFirestore)
           .where((job) => _matches(job, filters))
           .toList(growable: false);
+      _detailsCache.putAll(jobs);
       return JobsSearchPage(
         jobs: jobs,
         lastDocument: snapshot.docs.isEmpty ? null : snapshot.docs.last,
@@ -123,13 +128,34 @@ class JobsRepository {
               ..sort((a, b) => b.postedAt.compareTo(a.postedAt)),
       );
 
-  Stream<JobModel?> watchJob(String id) => _firestore
-      .collection('jobs')
-      .doc(id)
-      .snapshots()
-      .map(
-        (snapshot) => snapshot.exists ? JobModel.fromFirestore(snapshot) : null,
-      );
+  /// يعيد نتيجة قائمة محمّلة في جلسة التطبيق الحالية إن وُجدت.
+  ///
+  /// يستعمله موفر التفاصيل قبل أي قراءة منفردة من Firestore، بينما يظل
+  /// [getJob] هو البديل الآمن للرابط العميق أو عند إعادة تحميل المتصفح.
+  JobModel? findCachedJob(String jobId) => _detailsCache.read(jobId);
+
+  /// يجلب وظيفة مفردة للرابط المباشر ويحدث ذاكرة الجلسة للزيارات اللاحقة.
+  Future<JobModel?> getJob(String id) async {
+    final snapshot = await _firestore.collection('jobs').doc(id).get();
+    if (!snapshot.exists) {
+      _detailsCache.remove(id);
+      return null;
+    }
+    final job = JobModel.fromFirestore(snapshot);
+    _detailsCache.put(job);
+    return job;
+  }
+
+  Stream<JobModel?> watchJob(String id) =>
+      _firestore.collection('jobs').doc(id).snapshots().map((snapshot) {
+        if (!snapshot.exists) {
+          _detailsCache.remove(id);
+          return null;
+        }
+        final job = JobModel.fromFirestore(snapshot);
+        _detailsCache.put(job);
+        return job;
+      });
 
   Future<void> postJob({
     required String title,
