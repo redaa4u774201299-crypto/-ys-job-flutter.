@@ -5,7 +5,14 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
+import {
+  deleteDoc,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  writeBatch,
+} from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const projectId = 'demo-ysjob';
@@ -132,6 +139,116 @@ describe('Firestore company_directory security rules', () => {
       expect(
         (await getDoc(doc(adminDb, 'company_directory', employerId))).exists(),
       ).toBe(false);
+    });
+  });
+
+  it('يسمح لصاحب الشركة بحذف وثيقة دليله العام فقط', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'company_directory', employerId),
+        publicEntry,
+      );
+    });
+
+    const employer = testEnvironment.authenticatedContext(employerId).firestore();
+    await assertSucceeds(
+      deleteDoc(doc(employer, 'company_directory', employerId)),
+    );
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      expect(
+        (await getDoc(doc(context.firestore(), 'company_directory', employerId)))
+            .exists(),
+      ).toBe(false);
+    });
+  });
+
+  it('يرفض حذف شركة لوثيقة دليل لا يملكها المستخدم', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'company_directory', employerId),
+        publicEntry,
+      );
+    });
+
+    const otherEmployer = testEnvironment
+        .authenticatedContext(otherEmployerId)
+        .firestore();
+
+    await assertFails(
+      deleteDoc(doc(otherEmployer, 'company_directory', employerId)),
+    );
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      expect(
+        (await getDoc(doc(context.firestore(), 'company_directory', employerId)))
+            .exists(),
+      ).toBe(true);
+    });
+  });
+
+  it('يسمح بالتحديث الجزئي للحقول العامة ويحظر تغيير هوية الشركة', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'company_directory', employerId),
+        publicEntry,
+      );
+    });
+
+    const employer = testEnvironment.authenticatedContext(employerId).firestore();
+    const directoryRef = doc(employer, 'company_directory', employerId);
+
+    await assertSucceeds(
+      updateDoc(directoryRef, {
+        name: 'شركة الاختبار المحدّثة',
+        description: 'وصف عام محدّث دون أي وسيلة اتصال خاصة.',
+      }),
+    );
+    await assertFails(updateDoc(directoryRef, { id: otherEmployerId }));
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const entry = await getDoc(
+        doc(context.firestore(), 'company_directory', employerId),
+      );
+      expect(entry.data().id).toBe(employerId);
+      expect(entry.data().name).toBe('شركة الاختبار المحدّثة');
+    });
+  });
+
+  it('يرفض دفعة تحديث مركبة بالكامل عند محاولة نشر حقل حساس', async () => {
+    const previousName = publicEntry.name;
+    const previousDescription = publicEntry.description;
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'company_directory', employerId),
+        publicEntry,
+      );
+    });
+
+    const employer = testEnvironment.authenticatedContext(employerId).firestore();
+    const batch = writeBatch(employer);
+
+    batch.update(doc(employer, 'users', employerId), {
+      companyName: 'اسم لا يجب حفظه عند فشل الدفعة',
+    });
+    batch.update(doc(employer, 'company_directory', employerId), {
+      description: 'وصف لا يجب حفظه عند فشل الدفعة.',
+      phone: '700000000',
+    });
+
+    await assertFails(batch.commit());
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      expect((await getDoc(doc(adminDb, 'users', employerId))).data().companyName)
+          .toBe('شركة سابقة');
+      const entry = await getDoc(
+        doc(adminDb, 'company_directory', employerId),
+      );
+      expect(entry.data().name).toBe(previousName);
+      expect(entry.data().description).toBe(previousDescription);
+      expect(entry.data().phone).toBeUndefined();
     });
   });
 });

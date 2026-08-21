@@ -132,3 +132,5 @@
 - [x] إنشاء مهارة قابلة لإعادة الاستخدام لإعداد قواعد Firestore واختبارات Emulator ومراقبة فشل CI.
 - [x] إضافة تنبيه Webhook خارجي اختياري وآمن لفشل بوابة قواعد Firestore في GitHub Actions.
 - [x] توسيع مهارة Flutter Firestore Security CI بنمط Slack وTelegram القائم على GitHub Secrets.
+- [x] إضافة اختبارات Emulator لحذف وثائق company_directory المصرح بها ورفض الحذف غير المصرح به.
+- [x] إضافة اختبارات Emulator للتحديث الجزئي والدفعات المركبة التي تمنع الحقول الحساسة أو تجاوز الملكية.
