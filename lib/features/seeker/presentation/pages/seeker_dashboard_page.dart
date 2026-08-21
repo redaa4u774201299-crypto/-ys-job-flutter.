@@ -135,8 +135,8 @@ class _SeekerDashboard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   if (records.isEmpty)
-                    const _SeekerNotice(
-                      'لم تقدّم على أي وظيفة بعد. استكشف الفرص المتاحة لتبدأ.',
+                    _SeekerApplicationsEmptyState(
+                      onExplore: () => context.go(AppRoutes.jobs),
                     )
                   else
                     ...records.map(
@@ -153,6 +153,45 @@ class _SeekerDashboard extends ConsumerWidget {
       },
     );
   }
+}
+
+class _SeekerApplicationsEmptyState extends StatelessWidget {
+  const _SeekerApplicationsEmptyState({required this.onExplore});
+
+  final VoidCallback onExplore;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        children: [
+          Icon(
+            Icons.work_outline_rounded,
+            size: 48,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'لم تقدّم على أي وظيفة بعد',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'استكشف الفرص المتاحة، ثم قدّم على الوظيفة التي تناسب خبرتك.',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: onExplore,
+            icon: const Icon(Icons.search_outlined),
+            label: const Text('استكشاف الوظائف'),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _SeekerApplicationCard extends StatelessWidget {

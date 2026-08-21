@@ -147,7 +147,11 @@ service cloud.firestore {
     match /applications/{applicationId} {
       allow get, list: if isAdmin() ||
         (
-          isActiveUser() && resource.data.seekerId == request.auth.uid
+          isActiveUser() &&
+          (
+            resource.data.applicantId == request.auth.uid ||
+            resource.data.seekerId == request.auth.uid
+          )
         ) ||
         (
           isEmployer() && resource.data.employerId == request.auth.uid

@@ -6,9 +6,13 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  collection,
   doc,
+  getDocs,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
@@ -87,6 +91,27 @@ afterAll(async () => {
 });
 
 describe('Firestore application creation rules', () => {
+  it('يسمح للباحث النشط بقراءة طلباته عبر applicantId', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const currentApplication = applicationPayload();
+      delete currentApplication.seekerId;
+      await setDoc(
+        doc(context.firestore(), 'applications', applicationId),
+        currentApplication,
+      );
+    });
+    const seeker = testEnvironment.authenticatedContext(seekerId).firestore();
+
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(seeker, 'applications'),
+          where('applicantId', '==', seekerId),
+        ),
+      ),
+    );
+  });
+
   it('يسمح للباحث النشط بإنشاء طلب pending بهوية مقدم وتاريخ خادم صحيحين', async () => {
     const seeker = testEnvironment.authenticatedContext(seekerId).firestore();
 

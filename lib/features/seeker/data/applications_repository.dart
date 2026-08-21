@@ -168,7 +168,7 @@ class ApplicationsRepository {
 
     yield* _firestore
         .collection('applications')
-        .where('seekerId', isEqualTo: seeker.uid)
+        .where('applicantId', isEqualTo: seeker.uid)
         .snapshots()
         .asyncMap((snapshot) async {
           final applications =

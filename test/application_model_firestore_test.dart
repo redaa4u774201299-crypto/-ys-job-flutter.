@@ -39,4 +39,20 @@ void main() {
     expect(restored.applicantId, 'seeker-legacy');
     expect(restored.seekerId, 'seeker-legacy');
   });
+
+  test('يعطي applicantId أولوية القراءة في سجلات التقديم الجديدة', () {
+    final restored = ApplicationModel.fromJson({
+      'id': 'application-current',
+      'jobId': 'job-current',
+      'applicantId': 'applicant-current',
+      'seekerId': 'seeker-legacy-value',
+      'employerId': 'employer-current',
+      'status': 'accepted',
+      'appliedAt': '2026-08-21T09:00:00.000Z',
+    });
+
+    expect(restored.applicantId, 'applicant-current');
+    expect(restored.seekerId, 'applicant-current');
+    expect(restored.status, ApplicationStatus.accepted);
+  });
 }

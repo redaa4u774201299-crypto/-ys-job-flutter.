@@ -204,4 +204,41 @@ void main() {
     expect(cropResult, isNull);
     expect(after.data(), equals(before.data()));
   });
+
+  testWidgets('يعرض الملف الشخصي خروجًا مؤكدًا وينهي جلسة الباحث', (
+    tester,
+  ) async {
+    final firestore = await seededFirestore();
+    final auth = signedInAuth();
+    final repository = ProfileRepository(
+      firestore,
+      auth,
+      waitForPendingWrites: () async {},
+    );
+
+    await tester.pumpWidget(
+      buildProfileHarness(
+        firestore: firestore,
+        auth: auth,
+        repository: repository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final signOutButton = find.widgetWithText(OutlinedButton, 'تسجيل الخروج');
+    await tester.ensureVisible(signOutButton);
+    await tester.tap(signOutButton);
+    await tester.pumpAndSettle();
+    expect(find.text('هل تريد تسجيل الخروج من حسابك الآن؟'), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'تسجيل الخروج'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(auth.currentUser, isNull);
+  });
 }

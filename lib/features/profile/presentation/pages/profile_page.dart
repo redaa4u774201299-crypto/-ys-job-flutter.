@@ -4,8 +4,10 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/firebase/firebase_runtime.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../features/auth/data/auth_service.dart';
 import '../../../../features/jobs/presentation/widgets/firebase_setup_state.dart';
 import '../../../../shared/models/user_model.dart';
@@ -184,6 +186,34 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
   }
 
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تسجيل الخروج'),
+        content: const Text('هل تريد تسجيل الخروج من حسابك الآن؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('تسجيل الخروج'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ref.read(authServiceProvider).signOut();
+      if (mounted) context.go(AppRoutes.home);
+    } catch (error) {
+      if (mounted) _showError(error);
+    }
+  }
+
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
@@ -248,6 +278,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   onSave: () => _save(profile),
                   onSaveImage: () => _pickAndSaveImage(profile),
                   onRetryPendingSync: _retryPendingSync,
+                  onSignOut: _confirmSignOut,
                 );
               },
             );
@@ -276,6 +307,7 @@ class _ProfileForm extends StatelessWidget {
     required this.onSave,
     required this.onSaveImage,
     required this.onRetryPendingSync,
+    required this.onSignOut,
   });
 
   final GlobalKey<FormState> formKey;
@@ -296,6 +328,7 @@ class _ProfileForm extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onSaveImage;
   final VoidCallback onRetryPendingSync;
+  final VoidCallback onSignOut;
 
   bool get _isEmployer => profile.role == UserRole.employer;
 
@@ -540,6 +573,15 @@ class _ProfileForm extends StatelessWidget {
                       label: Text(
                         actions.isSaving ? 'جارٍ الحفظ…' : 'حفظ التغييرات',
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: actions.isBusy ? null : onSignOut,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                      icon: const Icon(Icons.logout_outlined),
+                      label: const Text('تسجيل الخروج'),
                     ),
                   ],
                 ),
