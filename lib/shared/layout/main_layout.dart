@@ -33,7 +33,7 @@ class MainLayout extends ConsumerWidget {
               ? null
               : AppBar(
                   title: const _Brand(),
-                  actions: const [_NotificationsBell()],
+                  actions: const [NotificationsBell()],
                 ),
           drawer: isDesktop || isJobDetails
               ? null
@@ -80,7 +80,7 @@ class _DesktopNavigation extends ConsumerWidget {
                   ),
                 ),
                 const Spacer(),
-                const _NotificationsBell(),
+                const NotificationsBell(),
                 const SizedBox(width: 8),
                 TextButton(
                   onPressed: () => context.go('/login'),
@@ -101,8 +101,8 @@ class _DesktopNavigation extends ConsumerWidget {
   }
 }
 
-class _NotificationsBell extends ConsumerWidget {
-  const _NotificationsBell();
+class NotificationsBell extends ConsumerWidget {
+  const NotificationsBell({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -10,6 +10,9 @@ abstract final class AppRoutes {
   static const employerDashboard = '/employer-dashboard';
   static const addJob = '/add-job';
   static const seekerDashboard = '/seeker-dashboard';
+  static const seekerSearch = '/seeker-dashboard/search';
+  static const seekerApplications = '/seeker-dashboard/applications';
+  static const seekerProfile = '/seeker-dashboard/profile';
   static const adminDashboard = '/admin-dashboard';
   static const adminUsers = '/admin/users';
   static const adminJobs = '/admin/jobs';

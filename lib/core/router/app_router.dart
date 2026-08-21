@@ -18,6 +18,7 @@ import '../../features/home/presentation/pages/landing_page.dart';
 import '../../features/jobs/presentation/pages/jobs_page.dart';
 import '../../features/seeker/presentation/pages/job_details_page.dart';
 import '../../features/seeker/presentation/pages/seeker_dashboard_page.dart';
+import '../../features/seeker/presentation/seeker_layout.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../shared/layout/main_layout.dart';
 
@@ -83,6 +84,27 @@ final appRouterProvider = Provider<GoRouter>(
         ],
       ),
       ShellRoute(
+        builder: (context, state, child) => SeekerLayout(child: child),
+        routes: [
+          GoRoute(
+            path: AppRoutes.seekerDashboard,
+            redirect: (context, state) => AppRoutes.seekerApplications,
+          ),
+          GoRoute(
+            path: AppRoutes.seekerSearch,
+            builder: (context, state) => const LandingPage(),
+          ),
+          GoRoute(
+            path: AppRoutes.seekerApplications,
+            builder: (context, state) => const SeekerDashboardPage(),
+          ),
+          GoRoute(
+            path: AppRoutes.seekerProfile,
+            builder: (context, state) => const ProfilePage(),
+          ),
+        ],
+      ),
+      ShellRoute(
         builder: (context, state, child) => MainLayout(child: child),
         routes: [
           GoRoute(path: '/', builder: (context, state) => const LandingPage()),
@@ -110,10 +132,6 @@ final appRouterProvider = Provider<GoRouter>(
           GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfilePage(),
-          ),
-          GoRoute(
-            path: AppRoutes.seekerDashboard,
-            builder: (context, state) => const SeekerDashboardPage(),
           ),
         ],
       ),
